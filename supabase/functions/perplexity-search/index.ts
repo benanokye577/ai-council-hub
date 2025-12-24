@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { query, searchMode } = await req.json();
+    const { query, searchMode, dateFilter, domains } = await req.json();
     
     if (!query) {
       return new Response(
@@ -31,7 +31,7 @@ serve(async (req) => {
       );
     }
 
-    console.log('Calling Perplexity API with query:', query);
+    console.log('Calling Perplexity API with query:', query, 'dateFilter:', dateFilter, 'domains:', domains);
 
     const requestBody: any = {
       model: 'sonar',
@@ -44,6 +44,16 @@ serve(async (req) => {
     // Add search mode if specified
     if (searchMode === 'academic') {
       requestBody.search_mode = 'academic';
+    }
+
+    // Add date recency filter
+    if (dateFilter && dateFilter !== 'any') {
+      requestBody.search_recency_filter = dateFilter;
+    }
+
+    // Add domain filter
+    if (domains && domains.length > 0) {
+      requestBody.search_domain_filter = domains;
     }
 
     const response = await fetch('https://api.perplexity.ai/chat/completions', {

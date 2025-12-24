@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Sparkles, ExternalLink, Loader2, BookOpen, Globe, X } from 'lucide-react';
+import { Search, Sparkles, ExternalLink, Loader2, BookOpen, Globe, X, Filter, Calendar, Link2, Plus, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
 
 interface SearchResult {
@@ -20,12 +22,35 @@ interface AISearchPanelProps {
   onClose?: () => void;
 }
 
+const DATE_FILTERS = [
+  { value: 'any', label: 'Any time' },
+  { value: 'day', label: 'Past 24 hours' },
+  { value: 'week', label: 'Past week' },
+  { value: 'month', label: 'Past month' },
+  { value: 'year', label: 'Past year' },
+];
+
+const SUGGESTED_DOMAINS = [
+  'wikipedia.org',
+  'github.com',
+  'stackoverflow.com',
+  'arxiv.org',
+  'nature.com',
+  'medium.com',
+];
+
 export function AISearchPanel({ className, onClose }: AISearchPanelProps) {
   const [query, setQuery] = useState('');
   const [searchMode, setSearchMode] = useState<'web' | 'academic'>('web');
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<SearchResult | null>(null);
   const [searchHistory, setSearchHistory] = useState<{ query: string; timestamp: Date }[]>([]);
+  
+  // Filter states
+  const [showFilters, setShowFilters] = useState(false);
+  const [dateFilter, setDateFilter] = useState('any');
+  const [domains, setDomains] = useState<string[]>([]);
+  const [newDomain, setNewDomain] = useState('');
 
   const handleSearch = async () => {
     if (!query.trim()) {
@@ -43,7 +68,12 @@ export function AISearchPanel({ className, onClose }: AISearchPanelProps) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ query, searchMode }),
+        body: JSON.stringify({ 
+          query, 
+          searchMode,
+          dateFilter: dateFilter !== 'any' ? dateFilter : undefined,
+          domains: domains.length > 0 ? domains : undefined,
+        }),
       });
 
       if (!response.ok) {
@@ -70,6 +100,30 @@ export function AISearchPanel({ className, onClose }: AISearchPanelProps) {
     }
   };
 
+  const handleAddDomain = () => {
+    if (!newDomain.trim()) return;
+    
+    // Clean the domain
+    let cleanDomain = newDomain.trim().toLowerCase();
+    cleanDomain = cleanDomain.replace(/^(https?:\/\/)?(www\.)?/, '');
+    cleanDomain = cleanDomain.split('/')[0];
+    
+    if (!domains.includes(cleanDomain)) {
+      setDomains(prev => [...prev, cleanDomain]);
+    }
+    setNewDomain('');
+  };
+
+  const handleRemoveDomain = (domain: string) => {
+    setDomains(prev => prev.filter(d => d !== domain));
+  };
+
+  const handleAddSuggestedDomain = (domain: string) => {
+    if (!domains.includes(domain)) {
+      setDomains(prev => [...prev, domain]);
+    }
+  };
+
   const extractDomain = (url: string) => {
     try {
       return new URL(url).hostname.replace('www.', '');
@@ -77,6 +131,8 @@ export function AISearchPanel({ className, onClose }: AISearchPanelProps) {
       return url;
     }
   };
+
+  const activeFiltersCount = (dateFilter !== 'any' ? 1 : 0) + (domains.length > 0 ? 1 : 0);
 
   return (
     <Card className={`bg-card/95 backdrop-blur-xl border-border/50 ${className}`}>
@@ -121,6 +177,19 @@ export function AISearchPanel({ className, onClose }: AISearchPanelProps) {
               disabled={isLoading}
             />
           </div>
+          <Button 
+            variant="outline" 
+            size="icon"
+            onClick={() => setShowFilters(!showFilters)}
+            className={activeFiltersCount > 0 ? 'border-primary text-primary' : ''}
+          >
+            <Filter className="h-4 w-4" />
+            {activeFiltersCount > 0 && (
+              <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] text-primary-foreground flex items-center justify-center">
+                {activeFiltersCount}
+              </span>
+            )}
+          </Button>
           <Button onClick={handleSearch} disabled={isLoading || !query.trim()}>
             {isLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -129,6 +198,113 @@ export function AISearchPanel({ className, onClose }: AISearchPanelProps) {
             )}
           </Button>
         </div>
+
+        {/* Filters Section */}
+        <Collapsible open={showFilters} onOpenChange={setShowFilters}>
+          <CollapsibleContent>
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="space-y-4 pt-2 border-t border-border/50"
+            >
+              {/* Date Filter */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  Date Range
+                </label>
+                <Select value={dateFilter} onValueChange={setDateFilter}>
+                  <SelectTrigger className="bg-background/50">
+                    <SelectValue placeholder="Select date range" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DATE_FILTERS.map(filter => (
+                      <SelectItem key={filter.value} value={filter.value}>
+                        {filter.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Domain Filter */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Link2 className="h-4 w-4 text-muted-foreground" />
+                  Filter by Domains
+                </label>
+                
+                {/* Active domains */}
+                {domains.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {domains.map(domain => (
+                      <Badge 
+                        key={domain} 
+                        variant="secondary"
+                        className="gap-1 pr-1"
+                      >
+                        {domain}
+                        <button 
+                          onClick={() => handleRemoveDomain(domain)}
+                          className="ml-1 hover:bg-destructive/20 rounded p-0.5"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-6 text-xs text-muted-foreground"
+                      onClick={() => setDomains([])}
+                    >
+                      <Trash2 className="h-3 w-3 mr-1" />
+                      Clear all
+                    </Button>
+                  </div>
+                )}
+
+                {/* Add domain input */}
+                <div className="flex gap-2">
+                  <Input
+                    value={newDomain}
+                    onChange={(e) => setNewDomain(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddDomain()}
+                    placeholder="Add domain (e.g., wikipedia.org)"
+                    className="bg-background/50 text-sm"
+                  />
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    onClick={handleAddDomain}
+                    disabled={!newDomain.trim()}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {/* Suggested domains */}
+                <div className="space-y-1.5">
+                  <span className="text-xs text-muted-foreground">Suggested:</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {SUGGESTED_DOMAINS.filter(d => !domains.includes(d)).slice(0, 4).map(domain => (
+                      <Badge 
+                        key={domain}
+                        variant="outline"
+                        className="cursor-pointer hover:bg-accent/50 transition-colors"
+                        onClick={() => handleAddSuggestedDomain(domain)}
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        {domain}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </CollapsibleContent>
+        </Collapsible>
 
         {/* Results */}
         <AnimatePresence mode="wait">
@@ -193,9 +369,21 @@ export function AISearchPanel({ className, onClose }: AISearchPanelProps) {
                 </div>
               )}
 
-              {/* Model info */}
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>Powered by Perplexity {result.model}</span>
+              {/* Active filters & Model info */}
+              <div className="flex items-center justify-between text-xs text-muted-foreground flex-wrap gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span>Powered by Perplexity {result.model}</span>
+                  {dateFilter !== 'any' && (
+                    <Badge variant="outline" className="text-xs">
+                      {DATE_FILTERS.find(f => f.value === dateFilter)?.label}
+                    </Badge>
+                  )}
+                  {domains.length > 0 && (
+                    <Badge variant="outline" className="text-xs">
+                      {domains.length} domain{domains.length > 1 ? 's' : ''}
+                    </Badge>
+                  )}
+                </div>
                 <Badge variant="secondary" className="text-xs">
                   {searchMode === 'academic' ? 'Academic' : 'Web'} Search
                 </Badge>
