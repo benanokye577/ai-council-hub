@@ -4,7 +4,7 @@ This document describes the voice interface implementation for integration with 
 
 ## Overview
 
-The voice interface provides real-time voice conversations using ElevenLabs Conversational AI. It features a 3D animated orb visualization, persona selection, conversation history, and accessibility support.
+The voice interface provides real-time voice conversations using ElevenLabs Conversational AI. It features a 3D animated orb visualization, persona selection, conversation history with export, session statistics, quick actions, and comprehensive accessibility support.
 
 ## Architecture
 
@@ -16,11 +16,16 @@ src/
 │   ├── VoiceInterface.tsx           # Main voice UI component
 │   ├── NebulaOrb.tsx                # 3D WebGL orb visualization (Three.js)
 │   ├── VoicePersonaSelector.tsx     # Persona selection UI
-│   └── ConversationHistory.tsx      # Message history panel
+│   ├── ConversationHistory.tsx      # Message history panel
+│   ├── ConversationExport.tsx       # Export conversations (text/md/json)
+│   ├── SessionStats.tsx             # Live session statistics
+│   ├── QuickActions.tsx             # Quick action suggestion buttons
+│   └── VoiceWaveform.tsx            # Audio waveform visualization
 ├── hooks/
 │   ├── useElevenLabsConversation.ts # ElevenLabs SDK integration
 │   ├── useVoiceSoundEffects.ts      # Sound effects & haptics
-│   └── useReducedMotion.ts          # Accessibility motion detection
+│   ├── useReducedMotion.ts          # Accessibility motion detection
+│   └── useVoiceCommands.ts          # Voice command processing
 ├── types/
 │   └── voicePersona.ts              # Persona type definitions
 └── supabase/functions/
@@ -36,7 +41,10 @@ The main voice interface component that orchestrates:
 - Orb state visualization (idle, listening, speaking, processing)
 - Settings panel with voice controls
 - Persona selection
-- Conversation history
+- Conversation history with export
+- Session statistics (duration, message count, word count)
+- Quick action suggestions
+- Waveform visualization
 - Keyboard shortcuts (Space to toggle, Escape to close)
 - Sound effects and haptic feedback
 - Tab visibility optimization (pauses rendering when hidden)
@@ -51,12 +59,48 @@ A 3D WebGL visualization using Three.js featuring:
 - Reduced motion support
 - Pause capability when tab is hidden
 
+### SessionStats.tsx
+Live session statistics component showing:
+- Conversation duration (live timer)
+- User message count
+- Assistant message count
+- Total word count
+
+### QuickActions.tsx
+Quick action suggestion buttons:
+- Summarize - Request conversation summary
+- Help - Ask what the assistant can help with
+- Tasks - Get task suggestions
+- Ideas - Request creative ideas
+- Continue - Continue from last point
+
+### ConversationExport.tsx
+Export functionality for conversation history:
+- Copy to clipboard
+- Export as plain text (.txt)
+- Export as Markdown (.md)
+- Export as JSON (.json)
+
+### VoiceWaveform.tsx
+Audio waveform visualization:
+- Real-time bar visualization
+- Color customization (primary, cyan, success)
+- Configurable bar count
+- Smooth animations
+
 ### useElevenLabsConversation.ts
 Custom hook wrapping the ElevenLabs React SDK:
 - Manages WebRTC connection to ElevenLabs
 - Handles conversation token retrieval from edge function
+- Supports custom agent IDs for personas
 - Provides transcript and agent response callbacks
 - Exposes volume levels for visualization
+
+### useVoiceCommands.ts
+Voice command processing hook:
+- Keyword detection in transcripts
+- Built-in commands: stop, mute, unmute, repeat, slower, faster
+- Extensible command system
 
 ## ElevenLabs Integration
 
@@ -102,6 +146,26 @@ Generates conversation tokens for WebRTC connections:
 - Sound effects toggle
 - Reduced motion mode
 
+### Session Statistics
+Displayed during active conversations:
+- Live duration timer
+- Message counts (user/assistant)
+- Total word count
+
+### Quick Actions
+Contextual action buttons shown when idle:
+- Summarize conversation
+- Get help
+- List tasks
+- Generate ideas
+- Continue conversation
+
+### Conversation Export
+Export conversation history in multiple formats:
+- Plain text with timestamps
+- Markdown with formatting
+- JSON with full metadata
+
 ### Accessibility
 - System reduced motion preference detection
 - Manual reduced motion toggle
@@ -127,6 +191,16 @@ Haptic feedback patterns:
 - `light` - 10ms vibration
 - `medium` - 25ms vibration
 - `heavy` - 50ms vibration
+
+## Voice Commands
+
+Built-in voice commands in `useVoiceCommands.ts`:
+- "stop" / "end" / "bye" - End conversation
+- "mute" / "quiet" - Mute audio
+- "unmute" / "speak" - Unmute audio
+- "repeat" / "say again" - Repeat last response
+- "slower" / "slow down" - Decrease speed
+- "faster" / "speed up" - Increase speed
 
 ## Styling
 
@@ -165,6 +239,29 @@ function MyComponent() {
 }
 ```
 
+### Adding New Quick Actions
+Edit `src/components/Voice/QuickActions.tsx`:
+```ts
+{
+  id: 'myaction',
+  label: 'My Action',
+  icon: <MyIcon className="w-4 h-4" />,
+  prompt: 'The prompt to send',
+}
+```
+
+### Adding Voice Commands
+Edit `src/hooks/useVoiceCommands.ts`:
+```ts
+{
+  keywords: ['my keyword', 'alternate keyword'],
+  action: () => {
+    // Your action here
+  },
+  description: 'Command description',
+}
+```
+
 ### Customizing Orb Appearance
 Edit `NebulaOrb.tsx`:
 - `STATE_COLORS` - Colors for each state
@@ -183,6 +280,24 @@ Update `useVoiceSoundEffects.ts`:
 - `framer-motion` - Animations
 - `lucide-react` - Icons
 
+## File Reference
+
+| File | Purpose |
+|------|---------|
+| `VoiceInterface.tsx` | Main UI orchestration |
+| `NebulaOrb.tsx` | 3D particle visualization |
+| `VoicePersonaSelector.tsx` | Persona selection grid |
+| `ConversationHistory.tsx` | Message list display |
+| `ConversationExport.tsx` | Export functionality |
+| `SessionStats.tsx` | Live statistics |
+| `QuickActions.tsx` | Action suggestions |
+| `VoiceWaveform.tsx` | Audio visualization |
+| `useElevenLabsConversation.ts` | ElevenLabs SDK wrapper |
+| `useVoiceSoundEffects.ts` | Audio feedback |
+| `useReducedMotion.ts` | Accessibility detection |
+| `useVoiceCommands.ts` | Command processing |
+| `voicePersona.ts` | Type definitions |
+
 ## Troubleshooting
 
 ### No audio/connection
@@ -200,3 +315,8 @@ Update `useVoiceSoundEffects.ts`:
 1. Enable reduced motion mode
 2. Check if tab visibility optimization is working
 3. Consider reducing `BASE_PARTICLES` in NebulaOrb
+
+### Export not working
+1. Check browser permissions for downloads
+2. Verify conversation history has messages
+3. Check console for blob creation errors
