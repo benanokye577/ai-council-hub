@@ -1,15 +1,91 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
-import { Eye, EyeOff, Mail, Lock, ArrowRight, Sparkles } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Eye, EyeOff, Mail, Lock, ArrowRight, Sparkles, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { z } from "zod";
+
+const loginSchema = z.object({
+  email: z.string().trim().email("Please enter a valid email address"),
+  password: z.string().min(1, "Password is required"),
+});
+
+const signupSchema = z.object({
+  email: z.string().trim().email("Please enter a valid email address"),
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters")
+    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+    .regex(/[0-9]/, "Password must contain at least one number"),
+});
+
+type FormErrors = {
+  email?: string;
+  password?: string;
+  general?: string;
+};
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [touched, setTouched] = useState({ email: false, password: false });
+
+  const validateField = (field: "email" | "password", value: string) => {
+    const schema = isLogin ? loginSchema : signupSchema;
+    const result = schema.shape[field].safeParse(value);
+    
+    if (!result.success) {
+      return result.error.errors[0].message;
+    }
+    return undefined;
+  };
+
+  const handleBlur = (field: "email" | "password") => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+    const value = field === "email" ? email : password;
+    const error = validateField(field, value);
+    setErrors((prev) => ({ ...prev, [field]: error }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrors({});
+    
+    const schema = isLogin ? loginSchema : signupSchema;
+    const result = schema.safeParse({ email, password });
+    
+    if (!result.success) {
+      const fieldErrors: FormErrors = {};
+      result.error.errors.forEach((err) => {
+        const path = err.path[0] as keyof FormErrors;
+        fieldErrors[path] = err.message;
+      });
+      setErrors(fieldErrors);
+      setTouched({ email: true, password: true });
+      return;
+    }
+
+    setIsLoading(true);
+    
+    // Simulate API call
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    
+    // Demo: show a general error for demonstration
+    setErrors({ general: "Authentication is not connected yet. This is a design preview." });
+    setIsLoading(false);
+  };
+
+  const toggleMode = () => {
+    setIsLogin(!isLogin);
+    setErrors({});
+    setTouched({ email: false, password: false });
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden">
@@ -63,23 +139,65 @@ const Auth = () => {
           transition={{ delay: 0.3 }}
           className="glass-card rounded-2xl p-8"
         >
-          <form className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* General Error */}
+            <AnimatePresence>
+              {errors.general && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="flex items-center gap-2 p-3 rounded-lg bg-error/10 border border-error/20 text-error"
+                >
+                  <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                  <span className="text-sm">{errors.general}</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* Email Field */}
             <div className="space-y-2">
               <Label htmlFor="email" className="text-foreground-secondary">
                 Email address
               </Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground-muted" />
+                <Mail className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors ${
+                  errors.email && touched.email ? "text-error" : "text-foreground-muted"
+                }`} />
                 <Input
                   id="email"
                   type="email"
                   placeholder="you@example.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10 h-12 bg-background-secondary border-border focus:border-primary"
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (touched.email) {
+                      const error = validateField("email", e.target.value);
+                      setErrors((prev) => ({ ...prev, email: error }));
+                    }
+                  }}
+                  onBlur={() => handleBlur("email")}
+                  disabled={isLoading}
+                  className={`pl-10 h-12 bg-background-secondary transition-colors ${
+                    errors.email && touched.email 
+                      ? "border-error focus:border-error" 
+                      : "border-border focus:border-primary"
+                  }`}
                 />
               </div>
+              <AnimatePresence>
+                {errors.email && touched.email && (
+                  <motion.p
+                    initial={{ opacity: 0, y: -5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -5 }}
+                    className="text-sm text-error flex items-center gap-1"
+                  >
+                    <AlertCircle className="w-4 h-4" />
+                    {errors.email}
+                  </motion.p>
+                )}
+              </AnimatePresence>
             </div>
 
             {/* Password Field */}
@@ -98,14 +216,28 @@ const Auth = () => {
                 )}
               </div>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground-muted" />
+                <Lock className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors ${
+                  errors.password && touched.password ? "text-error" : "text-foreground-muted"
+                }`} />
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 pr-10 h-12 bg-background-secondary border-border focus:border-primary"
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (touched.password) {
+                      const error = validateField("password", e.target.value);
+                      setErrors((prev) => ({ ...prev, password: error }));
+                    }
+                  }}
+                  onBlur={() => handleBlur("password")}
+                  disabled={isLoading}
+                  className={`pl-10 pr-10 h-12 bg-background-secondary transition-colors ${
+                    errors.password && touched.password 
+                      ? "border-error focus:border-error" 
+                      : "border-border focus:border-primary"
+                  }`}
                 />
                 <button
                   type="button"
@@ -115,15 +247,38 @@ const Auth = () => {
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
+              <AnimatePresence>
+                {errors.password && touched.password && (
+                  <motion.p
+                    initial={{ opacity: 0, y: -5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -5 }}
+                    className="text-sm text-error flex items-center gap-1"
+                  >
+                    <AlertCircle className="w-4 h-4" />
+                    {errors.password}
+                  </motion.p>
+                )}
+              </AnimatePresence>
             </div>
 
             {/* Submit Button */}
             <Button
               type="submit"
-              className="w-full h-12 btn-gradient text-primary-foreground font-medium"
+              disabled={isLoading}
+              className="w-full h-12 btn-gradient text-primary-foreground font-medium disabled:opacity-70"
             >
-              {isLogin ? "Sign in" : "Create account"}
-              <ArrowRight className="w-5 h-5 ml-2" />
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  {isLogin ? "Signing in..." : "Creating account..."}
+                </>
+              ) : (
+                <>
+                  {isLogin ? "Sign in" : "Create account"}
+                  <ArrowRight className="w-5 h-5 ml-2" />
+                </>
+              )}
             </Button>
           </form>
 
@@ -167,8 +322,9 @@ const Auth = () => {
           {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
           <button
             type="button"
-            onClick={() => setIsLogin(!isLogin)}
-            className="text-primary hover:text-primary-light font-medium transition-colors"
+            onClick={toggleMode}
+            disabled={isLoading}
+            className="text-primary hover:text-primary-light font-medium transition-colors disabled:opacity-50"
           >
             {isLogin ? "Sign up" : "Sign in"}
           </button>
