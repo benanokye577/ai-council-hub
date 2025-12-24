@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+// Voice Interface with ElevenLabs integration
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, MicOff, Settings, X, Volume2, VolumeX, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
