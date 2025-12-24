@@ -7,6 +7,7 @@ import { KnowledgeBaseCard } from "@/components/dashboard/KnowledgeBaseCard";
 import { SystemStatusCard } from "@/components/dashboard/SystemStatusCard";
 import { TodaysFocusCard } from "@/components/dashboard/TodaysFocusCard";
 import { CouncilHeroCard } from "@/components/dashboard/CouncilHeroCard";
+import { AISearchPanel } from "@/components/Search/AISearchPanel";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 
@@ -143,6 +144,7 @@ export default function Dashboard() {
 
         {/* Right Column */}
         <div className="space-y-6">
+          <AISearchPanel />
           <KnowledgeBaseCard />
           <SystemStatusCard />
         </div>
