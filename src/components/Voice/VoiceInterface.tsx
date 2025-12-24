@@ -7,6 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { NebulaOrb, OrbState } from './NebulaOrb';
+import { useElevenLabsConversation } from '@/hooks/useElevenLabsConversation';
 
 interface VoiceInterfaceProps {
   onClose?: () => void;
@@ -14,12 +15,9 @@ interface VoiceInterfaceProps {
 }
 
 export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
-  const [orbState, setOrbState] = useState<OrbState>('idle');
   const [isOrbReady, setIsOrbReady] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
-  const [transcript, setTranscript] = useState('');
-  const [response, setResponse] = useState('');
   const [isMuted, setIsMuted] = useState(false);
   
   // Settings state
@@ -33,114 +31,79 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
     continuousMode: false
   });
 
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  // ElevenLabs conversation hook
+  const {
+    status,
+    isConnected,
+    isConnecting,
+    isSpeaking,
+    transcript,
+    agentResponse,
+    startConversation,
+    stopConversation,
+    getInputVolume,
+    getOutputVolume,
+  } = useElevenLabsConversation({
+    onTranscript: (text) => {
+      console.log("User transcript:", text);
+    },
+    onAgentResponse: (text) => {
+      console.log("Agent response:", text);
+    },
+  });
+
+  // Derive orb state from ElevenLabs conversation status
+  const orbState: OrbState = (() => {
+    if (isConnecting) return 'processing';
+    if (!isConnected) return 'idle';
+    if (isSpeaking) return 'speaking';
+    return 'listening';
+  })();
+
+  // Audio level animation for visualization
   const animationRef = useRef<number>(0);
 
-  // Audio analysis for visualization
-  const startAudioAnalysis = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: settings.noiseReduction,
-          noiseSuppression: settings.noiseReduction,
-          autoGainControl: true
-        }
-      });
-      
-      streamRef.current = stream;
-      audioContextRef.current = new AudioContext();
-      analyserRef.current = audioContextRef.current.createAnalyser();
-      analyserRef.current.fftSize = 256;
-      
-      const source = audioContextRef.current.createMediaStreamSource(stream);
-      source.connect(analyserRef.current);
-      
-      const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-      
-      const analyze = () => {
-        if (!analyserRef.current) return;
-        
-        analyserRef.current.getByteFrequencyData(dataArray);
-        const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
-        setAudioLevel(average / 255);
-        
-        animationRef.current = requestAnimationFrame(analyze);
-      };
-      
-      analyze();
-    } catch (error) {
-      console.error('Failed to access microphone:', error);
-    }
-  }, [settings.noiseReduction]);
-
-  const stopAudioAnalysis = useCallback(() => {
-    cancelAnimationFrame(animationRef.current);
-    streamRef.current?.getTracks().forEach(track => track.stop());
-    audioContextRef.current?.close();
-    analyserRef.current = null;
-    audioContextRef.current = null;
-    streamRef.current = null;
-    setAudioLevel(0);
-  }, []);
-
-  const handleStartListening = async () => {
-    if (orbState !== 'idle') {
-      handleStop();
-      return;
-    }
-
-    setOrbState('listening');
-    setTranscript('');
-    setResponse('');
-    await startAudioAnalysis();
-    
-    // Simulate speech recognition
-    setTimeout(() => {
-      setTranscript('What tasks do I have scheduled for today?');
-      setOrbState('processing');
-      stopAudioAnalysis();
-      
-      setTimeout(() => {
-        setResponse("You have 4 tasks scheduled for today. The highest priority is reviewing the API documentation, due at 10 AM. Would you like me to read through them?");
-        setOrbState('speaking');
-        
-        // Simulate speaking animation
-        const speakInterval = setInterval(() => {
-          setAudioLevel(Math.random() * 0.6 + 0.2);
-        }, 100);
-        
-        setTimeout(() => {
-          clearInterval(speakInterval);
-          setAudioLevel(0);
-          if (settings.continuousMode) {
-            setOrbState('listening');
-            startAudioAnalysis();
-          } else {
-            setOrbState('idle');
-          }
-        }, 4000);
-      }, 2000);
-    }, 3000);
-  };
-
-  const handleStop = () => {
-    setOrbState('idle');
-    stopAudioAnalysis();
-  };
-
   useEffect(() => {
+    if (isConnected) {
+      const updateAudioLevel = () => {
+        try {
+          const inputLevel = getInputVolume?.() || 0;
+          const outputLevel = getOutputVolume?.() || 0;
+          // Use whichever is higher for visualization
+          setAudioLevel(Math.max(inputLevel, outputLevel));
+        } catch {
+          // Fallback if volume methods aren't available
+          if (isSpeaking) {
+            setAudioLevel(Math.random() * 0.6 + 0.2);
+          } else {
+            setAudioLevel(0.1);
+          }
+        }
+        animationRef.current = requestAnimationFrame(updateAudioLevel);
+      };
+      updateAudioLevel();
+    } else {
+      setAudioLevel(0);
+    }
+
     return () => {
-      stopAudioAnalysis();
+      cancelAnimationFrame(animationRef.current);
     };
-  }, [stopAudioAnalysis]);
+  }, [isConnected, isSpeaking, getInputVolume, getOutputVolume]);
+
+  const handleToggleConversation = async () => {
+    if (isConnected || isConnecting) {
+      await stopConversation();
+    } else {
+      await startConversation();
+    }
+  };
 
   const getStatusText = () => {
     switch (orbState) {
       case 'idle': return 'Tap to speak';
       case 'listening': return 'Listening...';
-      case 'processing': return 'Processing...';
+      case 'processing': return 'Connecting...';
       case 'speaking': return 'Speaking...';
     }
   };
@@ -216,7 +179,7 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
 
           {/* Click overlay */}
           <button
-            onClick={handleStartListening}
+            onClick={handleToggleConversation}
             disabled={!isOrbReady}
             className="absolute inset-0 rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-4 focus:ring-offset-background"
             aria-label={orbState === 'idle' ? 'Start speaking' : 'Stop'}
@@ -244,7 +207,7 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
 
         {/* Transcript/Response */}
         <AnimatePresence mode="wait">
-          {(transcript || response) && (
+          {(transcript || agentResponse) && (
             <motion.div 
               className="mt-6 w-full max-w-md space-y-3"
               initial={{ opacity: 0, y: 20 }}
@@ -258,10 +221,10 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
                   <p className="text-sm text-foreground">{transcript}</p>
                 </div>
               )}
-              {response && (
+              {agentResponse && (
                 <div className="p-3 rounded-lg bg-primary/10 backdrop-blur-sm border border-primary/20">
                   <p className="text-xs text-primary/70 mb-1">Response</p>
-                  <p className="text-sm text-foreground">{response}</p>
+                  <p className="text-sm text-foreground">{agentResponse}</p>
                 </div>
               )}
             </motion.div>
@@ -292,7 +255,7 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
                 ? "bg-primary hover:bg-primary/90 shadow-lg shadow-primary/30" 
                 : "bg-destructive hover:bg-destructive/90 shadow-lg shadow-destructive/30"
             )}
-            onClick={handleStartListening}
+            onClick={handleToggleConversation}
             disabled={!isOrbReady}
           >
             {orbState === 'idle' ? (
