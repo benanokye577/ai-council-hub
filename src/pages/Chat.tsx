@@ -16,6 +16,12 @@ import {
   User,
   Bot,
   Clock,
+  Scale,
+  CheckCircle2,
+  MinusCircle,
+  PenLine,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,11 +29,24 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
+interface AgentContribution {
+  name: string;
+  vote: "approve" | "abstain" | "modify";
+  weight: number;
+  expertise: string;
+  color: string;
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+  councilDeliberation?: {
+    consensus: number;
+    contributions: AgentContribution[];
+    decision: string;
+  };
 }
 
 interface Conversation {
@@ -71,13 +90,25 @@ const conversations: Conversation[] = [
   },
 ];
 
+const councilAgents: AgentContribution[] = [
+  { name: "Aria", vote: "approve", weight: 35, expertise: "Strategy", color: "hsl(var(--primary))" },
+  { name: "Marcus", vote: "approve", weight: 25, expertise: "Research", color: "hsl(280, 70%, 60%)" },
+  { name: "Echo", vote: "modify", weight: 20, expertise: "Code", color: "hsl(200, 70%, 60%)" },
+  { name: "Nova", vote: "approve", weight: 20, expertise: "Creative", color: "hsl(340, 70%, 60%)" },
+];
+
 const initialMessages: Message[] = [
   {
     id: "1",
     role: "assistant",
     content:
-      "Hello! I'm your Code Agent, specialized in programming assistance and code review. How can I help you today?",
+      "Hello! The Council is ready to assist you. We've assembled our specialists to provide comprehensive guidance. How can we help you today?",
     timestamp: new Date(Date.now() - 60000),
+    councilDeliberation: {
+      consensus: 100,
+      decision: "Unanimous greeting",
+      contributions: councilAgents.map(a => ({ ...a, vote: "approve" as const })),
+    },
   },
   {
     id: "2",
@@ -133,6 +164,16 @@ const Counter = () => {
 
 Would you like me to help you convert a specific component?`,
     timestamp: new Date(Date.now() - 40000),
+    councilDeliberation: {
+      consensus: 85,
+      decision: "Approved with modifications",
+      contributions: [
+        { name: "Aria", vote: "approve", weight: 35, expertise: "Strategy", color: "hsl(var(--primary))" },
+        { name: "Marcus", vote: "approve", weight: 25, expertise: "Research", color: "hsl(280, 70%, 60%)" },
+        { name: "Echo", vote: "modify", weight: 20, expertise: "Code", color: "hsl(200, 70%, 60%)" },
+        { name: "Nova", vote: "approve", weight: 20, expertise: "Creative", color: "hsl(340, 70%, 60%)" },
+      ],
+    },
   },
 ];
 
@@ -187,6 +228,115 @@ function CodeBlock({
   );
 }
 
+function CouncilDeliberation({ deliberation }: { deliberation: Message["councilDeliberation"] }) {
+  const [expanded, setExpanded] = useState(false);
+  
+  if (!deliberation) return null;
+
+  const getVoteIcon = (vote: AgentContribution["vote"]) => {
+    switch (vote) {
+      case "approve": return <CheckCircle2 className="w-3 h-3 text-success" />;
+      case "abstain": return <MinusCircle className="w-3 h-3 text-foreground-tertiary" />;
+      case "modify": return <PenLine className="w-3 h-3 text-warning" />;
+    }
+  };
+
+  const getVoteLabel = (vote: AgentContribution["vote"]) => {
+    switch (vote) {
+      case "approve": return "Approved";
+      case "abstain": return "Abstained";
+      case "modify": return "Modified";
+    }
+  };
+
+  return (
+    <motion.div 
+      className="mt-3 pt-3 border-t border-border/50"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+    >
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between text-xs text-foreground-secondary hover:text-foreground transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <Scale className="w-3.5 h-3.5 text-primary" />
+          <span className="font-medium">Council Deliberation</span>
+          <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+            {deliberation.consensus}% consensus
+          </Badge>
+        </div>
+        {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+      </button>
+
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="mt-3 space-y-2">
+              <div className="text-[10px] text-foreground-tertiary mb-2">
+                Decision: <span className="text-foreground-secondary">{deliberation.decision}</span>
+              </div>
+              
+              {deliberation.contributions.map((agent, idx) => (
+                <motion.div
+                  key={agent.name}
+                  initial={{ x: -10, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  transition={{ delay: idx * 0.05 }}
+                  className="flex items-center gap-2 p-2 rounded-lg bg-background/50"
+                >
+                  <div 
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
+                    style={{ backgroundColor: agent.color }}
+                  >
+                    {agent.name[0]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-medium text-foreground">{agent.name}</span>
+                      <Badge variant="outline" className="text-[9px] px-1 py-0">
+                        {agent.expertise}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      {getVoteIcon(agent.vote)}
+                      <span className="text-[10px] text-foreground-tertiary">{getVoteLabel(agent.vote)}</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs font-semibold text-foreground">{agent.weight}%</div>
+                    <div className="text-[9px] text-foreground-tertiary">weight</div>
+                  </div>
+                </motion.div>
+              ))}
+
+              {/* Vote weight visualization */}
+              <div className="flex h-2 rounded-full overflow-hidden mt-2">
+                {deliberation.contributions.map((agent) => (
+                  <motion.div
+                    key={agent.name}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${agent.weight}%` }}
+                    transition={{ duration: 0.5, delay: 0.2 }}
+                    className="h-full"
+                    style={{ backgroundColor: agent.color }}
+                    title={`${agent.name}: ${agent.weight}%`}
+                  />
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
 function ChatMessage({ message }: { message: Message }) {
   const isUser = message.role === "user";
 
@@ -206,7 +356,7 @@ function ChatMessage({ message }: { message: Message }) {
         {isUser ? (
           <User className="w-4 h-4 text-primary-foreground" />
         ) : (
-          <Bot className="w-4 h-4 text-primary" />
+          <Scale className="w-4 h-4 text-primary" />
         )}
       </div>
 
@@ -267,6 +417,12 @@ function ChatMessage({ message }: { message: Message }) {
             {message.content}
           </ReactMarkdown>
         </div>
+        
+        {/* Council Deliberation Section */}
+        {!isUser && message.councilDeliberation && (
+          <CouncilDeliberation deliberation={message.councilDeliberation} />
+        )}
+        
         <div className="flex items-center gap-2 mt-2 text-[10px] text-foreground-tertiary">
           <Clock className="w-3 h-3" />
           {message.timestamp.toLocaleTimeString([], {
@@ -331,7 +487,7 @@ export default function Chat() {
     setInput("");
     setIsTyping(true);
 
-    // Simulate AI response
+    // Simulate AI response with council deliberation
     setTimeout(() => {
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -339,6 +495,14 @@ export default function Chat() {
         content:
           "I understand you want to learn more about this topic. Let me provide some insights...\n\nThis is a simulated response. In a real implementation, this would be connected to an AI backend using Lovable Cloud.",
         timestamp: new Date(),
+        councilDeliberation: {
+          consensus: Math.floor(Math.random() * 30) + 70,
+          decision: "Collaborative response approved",
+          contributions: councilAgents.map(a => ({
+            ...a,
+            vote: Math.random() > 0.2 ? "approve" as const : "modify" as const,
+          })),
+        },
       };
       setMessages((prev) => [...prev, assistantMessage]);
       setIsTyping(false);
