@@ -4,7 +4,7 @@ This document describes the voice interface implementation for integration with 
 
 ## Overview
 
-The voice interface provides real-time voice conversations using ElevenLabs Conversational AI. It features a 3D animated orb visualization, persona selection, conversation history with export, session statistics, quick actions, and comprehensive accessibility support.
+The voice interface provides real-time voice conversations using ElevenLabs Conversational AI. It features a 3D animated orb visualization, persona selection, **persistent conversation memory**, conversation history with export, session statistics, quick actions, and comprehensive accessibility support.
 
 ## Architecture
 
@@ -19,10 +19,12 @@ src/
 │   ├── ConversationHistory.tsx      # Message history panel
 │   ├── ConversationExport.tsx       # Export conversations (text/md/json)
 │   ├── SessionStats.tsx             # Live session statistics
+│   ├── SessionList.tsx              # Past sessions browser
 │   ├── QuickActions.tsx             # Quick action suggestion buttons
 │   └── VoiceWaveform.tsx            # Audio waveform visualization
 ├── hooks/
 │   ├── useElevenLabsConversation.ts # ElevenLabs SDK integration
+│   ├── useConversationMemory.ts     # Persistent session storage
 │   ├── useVoiceSoundEffects.ts      # Sound effects & haptics
 │   ├── useReducedMotion.ts          # Accessibility motion detection
 │   └── useVoiceCommands.ts          # Voice command processing
@@ -41,6 +43,7 @@ The main voice interface component that orchestrates:
 - Orb state visualization (idle, listening, speaking, processing)
 - Settings panel with voice controls
 - Persona selection
+- **Persistent conversation memory** with session management
 - Conversation history with export
 - Session statistics (duration, message count, word count)
 - Quick action suggestions
@@ -48,6 +51,22 @@ The main voice interface component that orchestrates:
 - Keyboard shortcuts (Space to toggle, Escape to close)
 - Sound effects and haptic feedback
 - Tab visibility optimization (pauses rendering when hidden)
+
+### useConversationMemory.ts
+Custom hook for persistent conversation storage:
+- Saves up to 10 sessions in localStorage
+- Auto-generates session titles from first user message
+- Tracks persona used per session
+- Timestamps for creation and last update
+- Session CRUD operations (create, read, update, delete)
+
+### SessionList.tsx
+Past sessions browser component:
+- Lists all saved sessions with metadata
+- Shows persona, message count, and timestamp
+- One-click to resume any session
+- Delete individual sessions
+- Create new session button
 
 ### NebulaOrb.tsx
 A 3D WebGL visualization using Three.js featuring:
@@ -130,6 +149,15 @@ Generates conversation tokens for WebRTC connections:
 - Returns `{ token: string }` for client use
 
 ## Features
+
+### Persistent Conversation Memory
+Conversations are automatically saved to localStorage:
+- Up to 10 sessions stored
+- Sessions include all messages with timestamps
+- Tracks which persona was used
+- Auto-generated titles from first user message
+- Resume any past session instantly
+- Delete sessions individually
 
 ### Keyboard Shortcuts
 - `Space` - Start/stop conversation
@@ -289,7 +317,9 @@ Update `useVoiceSoundEffects.ts`:
 | `VoicePersonaSelector.tsx` | Persona selection grid |
 | `ConversationHistory.tsx` | Message list display |
 | `ConversationExport.tsx` | Export functionality |
+| `SessionList.tsx` | Past sessions browser |
 | `SessionStats.tsx` | Live statistics |
+| `useConversationMemory.ts` | Persistent storage hook |
 | `QuickActions.tsx` | Action suggestions |
 | `VoiceWaveform.tsx` | Audio visualization |
 | `useElevenLabsConversation.ts` | ElevenLabs SDK wrapper |

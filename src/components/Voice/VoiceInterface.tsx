@@ -1,7 +1,7 @@
 // Voice Interface with ElevenLabs integration
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, MicOff, Settings, X, Volume2, VolumeX, Loader2, History, Keyboard, User } from 'lucide-react';
+import { Mic, MicOff, Settings, X, Volume2, VolumeX, Loader2, History, Keyboard, User, FolderOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
@@ -18,6 +18,8 @@ import { SessionStats } from './SessionStats';
 import { QuickActions } from './QuickActions';
 import { ConversationExport } from './ConversationExport';
 import { VoiceWaveform } from './VoiceWaveform';
+import { useConversationMemory } from '@/hooks/useConversationMemory';
+import { SessionList } from './SessionList';
 
 interface VoiceInterfaceProps {
   onClose?: () => void;
@@ -29,11 +31,23 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showPersonas, setShowPersonas] = useState(false);
+  const [showSessions, setShowSessions] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [isTabVisible, setIsTabVisible] = useState(true);
-  const [conversationHistory, setConversationHistory] = useState<ConversationMessage[]>([]);
   const [selectedPersona, setSelectedPersona] = useState<VoicePersona>(VOICE_PERSONAS[0]);
+
+  // Conversation memory hook for persistence
+  const {
+    sessions,
+    currentSession,
+    currentSessionId,
+    currentMessages,
+    createSession,
+    addMessage: addMessageToSession,
+    loadSession,
+    deleteSession,
+  } = useConversationMemory();
   
   // Accessibility
   const systemReducedMotion = useReducedMotion();
@@ -87,18 +101,16 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
     },
   });
 
-  // Add message to history
+  // Add message to history (uses persistent memory)
   const addMessage = useCallback((role: 'user' | 'assistant', content: string) => {
-    setConversationHistory(prev => [
-      ...prev,
-      {
-        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        role,
-        content,
-        timestamp: new Date(),
-      }
-    ]);
-  }, []);
+    const message: ConversationMessage = {
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      role,
+      content,
+      timestamp: new Date(),
+    };
+    addMessageToSession(message);
+  }, [addMessageToSession]);
 
   // Derive orb state from ElevenLabs conversation status
   const orbState: OrbState = (() => {
@@ -178,16 +190,20 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
     if (isConnected || isConnecting) {
       await stopConversation();
     } else {
+      // Create a new session if none exists
+      if (!currentSessionId) {
+        createSession(selectedPersona.id, selectedPersona.name);
+      }
       await startConversation();
     }
-  }, [isConnected, isConnecting, startConversation, stopConversation]);
+  }, [isConnected, isConnecting, startConversation, stopConversation, currentSessionId, createSession, selectedPersona]);
 
   // Keyboard shortcut - Spacebar to toggle
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't trigger if user is typing in an input or if settings is open
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (showSettings || showHistory || showPersonas) return;
+      if (showSettings || showHistory || showPersonas || showSessions) return;
       
       if (e.code === 'Space' && isOrbReady) {
         e.preventDefault();
@@ -202,7 +218,7 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleToggleConversation, isOrbReady, showSettings, showHistory, showPersonas, onClose]);
+  }, [handleToggleConversation, isOrbReady, showSettings, showHistory, showPersonas, showSessions, onClose]);
 
   const getStatusText = () => {
     switch (orbState) {
@@ -256,6 +272,15 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-9 w-9 text-muted-foreground hover:text-foreground"
+            onClick={() => setShowSessions(!showSessions)}
+            title="Past Sessions"
+          >
+            <FolderOpen className="w-4 h-4" />
+          </Button>
           <Button 
             variant="ghost" 
             size="icon" 
@@ -337,7 +362,7 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
         {isConnected && (
           <SessionStats 
             isActive={isConnected} 
-            messages={conversationHistory} 
+            messages={currentMessages}
             className="mt-4"
           />
         )}
@@ -452,16 +477,56 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
               <div className="flex items-center justify-between p-4 border-b border-border/30">
                 <h2 className="text-xl font-semibold">Conversation History</h2>
                 <div className="flex items-center gap-2">
-                  <ConversationExport messages={conversationHistory} />
+                  <ConversationExport messages={currentMessages} />
                   <Button variant="ghost" size="icon" onClick={() => setShowHistory(false)}>
                     <X className="w-5 h-5" />
                   </Button>
                 </div>
               </div>
               <ConversationHistory 
-                messages={conversationHistory} 
+                messages={currentMessages} 
                 className="flex-1"
                 reducedMotion={prefersReducedMotion}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Sessions Panel */}
+      <AnimatePresence>
+        {showSessions && (
+          <motion.div
+            className="absolute inset-0 z-20 bg-background/95 backdrop-blur-lg"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.2 }}
+          >
+            <div className="h-full flex flex-col">
+              <div className="flex items-center justify-between p-4 border-b border-border/30">
+                <div>
+                  <h2 className="text-xl font-semibold">Past Sessions</h2>
+                  <p className="text-sm text-muted-foreground">Resume previous conversations</p>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setShowSessions(false)}>
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              <SessionList
+                sessions={sessions}
+                currentSessionId={currentSessionId}
+                onSelectSession={(id) => {
+                  loadSession(id);
+                  setShowSessions(false);
+                }}
+                onDeleteSession={deleteSession}
+                onNewSession={() => {
+                  createSession(selectedPersona.id, selectedPersona.name);
+                  setShowSessions(false);
+                }}
+                reducedMotion={prefersReducedMotion}
+                className="flex-1"
               />
             </div>
           </motion.div>
