@@ -19,6 +19,7 @@ import {
   Mic,
   Puzzle,
   Monitor,
+  GraduationCap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -55,6 +56,7 @@ const navItems = [
   { icon: Users, label: "Agents", path: "/agents", badge: "5" },
   { icon: Timer, label: "Focus", path: "/focus" },
   { icon: Mic, label: "Voice", path: "/voice" },
+  { icon: GraduationCap, label: "Study", path: "/study" },
   { icon: Monitor, label: "Automation", path: "/automation" },
   { icon: Puzzle, label: "MCP", path: "/mcp" },
   { icon: LayoutDashboard, label: "Workflows", path: "/workflows" },
