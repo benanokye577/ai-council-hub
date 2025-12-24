@@ -1,4 +1,3 @@
-import { motion } from "framer-motion";
 import { 
   Mail, 
   Clock, 
@@ -11,12 +10,13 @@ import {
   Database,
   Bell,
   Brain,
-  MessageSquare,
   Sparkles,
-  Wand2
+  Wand2,
+  MessageSquare,
+  LucideIcon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { NodeType, NODE_TEMPLATES } from "@/types/workflow";
+import { NodeType } from "@/types/workflow";
 
 interface NodeTemplate {
   id: string;
@@ -24,32 +24,39 @@ interface NodeTemplate {
   label: string;
   description: string;
   icon: string;
-  lucideIcon: typeof Mail;
+  lucideIcon: LucideIcon;
 }
 
 const nodeTemplates: NodeTemplate[] = [
   // Triggers
-  { id: "email_trigger", type: "trigger", label: "Email Received", description: "Triggers when email arrives", icon: "📧", lucideIcon: Mail },
-  { id: "schedule_trigger", type: "trigger", label: "Schedule", description: "Run on a schedule", icon: "🕐", lucideIcon: Clock },
-  { id: "webhook_trigger", type: "trigger", label: "Webhook", description: "HTTP webhook trigger", icon: "🔗", lucideIcon: Webhook },
-  { id: "file_trigger", type: "trigger", label: "File Created", description: "When file is created", icon: "📁", lucideIcon: FileText },
+  { id: "email_trigger", type: "trigger", label: "Email", description: "On email received", icon: "📧", lucideIcon: Mail },
+  { id: "schedule_trigger", type: "trigger", label: "Schedule", description: "Run on schedule", icon: "🕐", lucideIcon: Clock },
+  { id: "webhook_trigger", type: "trigger", label: "Webhook", description: "HTTP webhook", icon: "🔗", lucideIcon: Webhook },
+  { id: "file_trigger", type: "trigger", label: "File", description: "On file created", icon: "📁", lucideIcon: FileText },
   
   // Conditions
-  { id: "branch", type: "condition", label: "Branch", description: "Split based on condition", icon: "🔀", lucideIcon: GitBranch },
+  { id: "branch", type: "condition", label: "Branch", description: "Split on condition", icon: "🔀", lucideIcon: GitBranch },
   { id: "filter", type: "condition", label: "Filter", description: "Filter by criteria", icon: "🔍", lucideIcon: Filter },
   
   // Actions
-  { id: "create_task", type: "action", label: "Create Task", description: "Add a new task", icon: "✅", lucideIcon: CheckCircle },
-  { id: "send_message", type: "action", label: "Send Message", description: "Send Slack/email", icon: "💬", lucideIcon: Send },
-  { id: "update_db", type: "action", label: "Update Database", description: "Write to database", icon: "🗄️", lucideIcon: Database },
-  { id: "notify", type: "action", label: "Notification", description: "Send notification", icon: "🔔", lucideIcon: Bell },
+  { id: "create_task", type: "action", label: "Task", description: "Create task", icon: "✅", lucideIcon: CheckCircle },
+  { id: "send_message", type: "action", label: "Message", description: "Send message", icon: "💬", lucideIcon: Send },
+  { id: "update_db", type: "action", label: "Database", description: "Update database", icon: "🗄️", lucideIcon: Database },
+  { id: "notify", type: "action", label: "Notify", description: "Send notification", icon: "🔔", lucideIcon: Bell },
   
   // AI
-  { id: "ai_extract", type: "ai", label: "AI Extract", description: "Extract data with AI", icon: "🤖", lucideIcon: Brain },
-  { id: "ai_summarize", type: "ai", label: "AI Summarize", description: "Summarize content", icon: "✨", lucideIcon: Sparkles },
-  { id: "ai_generate", type: "ai", label: "AI Generate", description: "Generate content", icon: "🪄", lucideIcon: Wand2 },
-  { id: "ai_respond", type: "ai", label: "AI Respond", description: "Generate response", icon: "💭", lucideIcon: MessageSquare },
+  { id: "ai_extract", type: "ai", label: "Extract", description: "AI data extraction", icon: "🤖", lucideIcon: Brain },
+  { id: "ai_summarize", type: "ai", label: "Summarize", description: "AI summarization", icon: "✨", lucideIcon: Sparkles },
+  { id: "ai_generate", type: "ai", label: "Generate", description: "AI content gen", icon: "🪄", lucideIcon: Wand2 },
+  { id: "ai_respond", type: "ai", label: "Respond", description: "AI response", icon: "💭", lucideIcon: MessageSquare },
 ];
+
+const typeConfig: Record<NodeType, { label: string; color: string }> = {
+  trigger: { label: "TRIGGERS", color: "hsl(var(--workflow-trigger))" },
+  condition: { label: "LOGIC", color: "hsl(var(--workflow-condition))" },
+  action: { label: "ACTIONS", color: "hsl(var(--workflow-action))" },
+  ai: { label: "AI", color: "hsl(var(--workflow-ai))" },
+};
 
 interface NodePaletteProps {
   onDragStart: (template: NodeTemplate, e: React.DragEvent) => void;
@@ -64,52 +71,61 @@ export function NodePalette({ onDragStart, className }: NodePaletteProps) {
     ai: nodeTemplates.filter(n => n.type === 'ai'),
   };
 
-  const groupLabels: Record<NodeType, string> = {
-    trigger: 'Triggers',
-    condition: 'Conditions',
-    action: 'Actions',
-    ai: 'AI Nodes',
-  };
-
   return (
-    <div className={cn("space-y-4 p-3", className)}>
-      <h3 className="text-sm font-semibold text-foreground px-1">Node Palette</h3>
+    <div className={cn("py-3", className)}>
+      <div className="px-3 mb-4">
+        <h3 className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
+          Components
+        </h3>
+      </div>
       
       {(Object.keys(groupedNodes) as NodeType[]).map((type) => (
-        <div key={type} className="space-y-2">
-          <div className="flex items-center gap-2 px-1">
+        <div key={type} className="mb-4">
+          <div className="flex items-center gap-2 px-3 mb-2">
             <div 
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: NODE_TEMPLATES[type].color }}
+              className="w-1.5 h-1.5 rounded-full"
+              style={{ backgroundColor: typeConfig[type].color }}
             />
-            <span className="text-xs font-medium text-foreground-secondary">
-              {groupLabels[type]}
+            <span className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+              {typeConfig[type].label}
             </span>
           </div>
           
-          <div className="space-y-1">
-            {groupedNodes[type].map((template) => (
-              <motion.div
-                key={template.id}
-                draggable
-                onDragStart={(e) => onDragStart(template, e as any)}
-                whileHover={{ scale: 1.02, x: 2 }}
-                whileTap={{ scale: 0.98 }}
-                className={cn(
-                  "flex items-center gap-2 px-2 py-2 rounded-md cursor-grab active:cursor-grabbing",
-                  "border border-transparent hover:border-border",
-                  "transition-colors"
-                )}
-                style={{ backgroundColor: NODE_TEMPLATES[template.type].bgColor }}
-              >
-                <span className="text-base">{template.icon}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-foreground truncate">
-                    {template.label}
-                  </p>
+          <div className="space-y-0.5 px-1.5">
+            {groupedNodes[type].map((template) => {
+              const Icon = template.lucideIcon;
+              return (
+                <div
+                  key={template.id}
+                  draggable
+                  onDragStart={(e) => onDragStart(template, e)}
+                  className={cn(
+                    "group flex items-center gap-2.5 px-2 py-2 rounded-md cursor-grab active:cursor-grabbing",
+                    "hover:bg-secondary/50 transition-colors select-none"
+                  )}
+                >
+                  <div 
+                    className="w-6 h-6 rounded flex items-center justify-center shrink-0"
+                    style={{ 
+                      backgroundColor: `color-mix(in srgb, ${typeConfig[type].color} 15%, transparent)`,
+                    }}
+                  >
+                    <Icon 
+                      className="w-3.5 h-3.5" 
+                      style={{ color: typeConfig[type].color }}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-foreground truncate">
+                      {template.label}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground truncate">
+                      {template.description}
+                    </p>
+                  </div>
                 </div>
-              </motion.div>
-            ))}
+              );
+            })}
           </div>
         </div>
       ))}

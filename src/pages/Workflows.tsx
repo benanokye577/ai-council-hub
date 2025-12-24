@@ -1,16 +1,14 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
-import { Workflow, Save, Settings, Play } from "lucide-react";
+import { Save, Play, ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WorkflowCanvas } from "@/components/Workflows/WorkflowCanvas";
 import { NodePalette, NodeTemplate } from "@/components/Workflows/NodePalette";
 import { WorkflowRunner } from "@/components/Workflows/WorkflowRunner";
 import { WorkflowLibrary } from "@/components/Workflows/WorkflowLibrary";
 import { WorkflowNodeData, WorkflowConnection, Workflow as WorkflowType } from "@/types/workflow";
 import { toast } from "sonner";
+import { Link } from "react-router-dom";
 
 export default function Workflows() {
   const [nodes, setNodes] = useState<WorkflowNodeData[]>([]);
@@ -18,6 +16,7 @@ export default function Workflows() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [workflowName, setWorkflowName] = useState("Untitled Workflow");
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | undefined>();
+  const [activePanel, setActivePanel] = useState<'library' | 'runner'>('library');
 
   const handlePaletteDragStart = (template: NodeTemplate, e: React.DragEvent) => {
     e.dataTransfer.setData("application/json", JSON.stringify(template));
@@ -40,7 +39,7 @@ export default function Workflows() {
   };
 
   const handleSave = () => {
-    toast.success("Workflow saved!");
+    toast.success("Workflow saved");
   };
 
   const handleNodeConfigure = (nodeId: string) => {
@@ -51,50 +50,45 @@ export default function Workflows() {
   };
 
   return (
-    <div className="min-h-screen p-6 bg-gradient-mesh">
-      <div className="max-w-[1600px] mx-auto space-y-4">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/20">
-                <Workflow className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <Input
-                  value={workflowName}
-                  onChange={(e) => setWorkflowName(e.target.value)}
-                  className="h-8 text-lg font-semibold bg-transparent border-none p-0 focus-visible:ring-0"
-                />
-                <p className="text-sm text-foreground-secondary">
-                  {nodes.length} nodes • {connections.length} connections
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={handleSave}>
-              <Save className="w-4 h-4 mr-2" />
-              Save
-            </Button>
-            <Button className="btn-gradient">
-              <Play className="w-4 h-4 mr-2" />
-              Run
-            </Button>
-          </div>
+    <div className="h-screen flex flex-col bg-background overflow-hidden">
+      {/* Minimal Header */}
+      <header className="h-14 border-b border-border/50 flex items-center justify-between px-4 shrink-0">
+        <div className="flex items-center gap-3">
+          <Link to="/" className="p-1.5 -ml-1.5 rounded-md hover:bg-secondary/50 transition-colors">
+            <ChevronLeft className="w-4 h-4 text-muted-foreground" />
+          </Link>
+          <div className="h-5 w-px bg-border" />
+          <Input
+            value={workflowName}
+            onChange={(e) => setWorkflowName(e.target.value)}
+            className="h-7 w-48 text-sm font-medium bg-transparent border-transparent hover:border-border focus:border-primary px-2"
+          />
+          <span className="text-xs text-muted-foreground font-mono">
+            {nodes.length}n · {connections.length}c
+          </span>
         </div>
 
-        {/* Main Layout */}
-        <div className="grid grid-cols-[220px_1fr_280px] gap-4 h-[calc(100vh-180px)]">
-          {/* Left Sidebar - Node Palette */}
-          <Card className="glass-card overflow-hidden">
-            <CardContent className="p-0 h-full overflow-y-auto">
-              <NodePalette onDragStart={handlePaletteDragStart} />
-            </CardContent>
-          </Card>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={handleSave} className="text-xs h-7 px-3">
+            <Save className="w-3.5 h-3.5 mr-1.5" />
+            Save
+          </Button>
+          <Button size="sm" className="text-xs h-7 px-3 bg-primary hover:bg-primary/90" onClick={() => setActivePanel('runner')}>
+            <Play className="w-3.5 h-3.5 mr-1.5" />
+            Run
+          </Button>
+        </div>
+      </header>
 
-          {/* Center - Canvas */}
+      {/* Main Content */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left: Node Palette */}
+        <aside className="w-52 border-r border-border/50 overflow-y-auto">
+          <NodePalette onDragStart={handlePaletteDragStart} />
+        </aside>
+
+        {/* Center: Canvas */}
+        <main className="flex-1 relative">
           <WorkflowCanvas
             nodes={nodes}
             connections={connections}
@@ -105,55 +99,53 @@ export default function Workflows() {
             onNodeConfigure={handleNodeConfigure}
             className="h-full"
           />
+        </main>
 
-          {/* Right Sidebar */}
-          <Card className="glass-card overflow-hidden">
-            <CardContent className="p-0 h-full">
-              <Tabs defaultValue="library" className="h-full flex flex-col">
-                <TabsList className="w-full rounded-none border-b border-border">
-                  <TabsTrigger value="library" className="flex-1 text-xs">Library</TabsTrigger>
-                  <TabsTrigger value="run" className="flex-1 text-xs">Run</TabsTrigger>
-                  <TabsTrigger value="config" className="flex-1 text-xs">Config</TabsTrigger>
-                </TabsList>
+        {/* Right: Panel */}
+        <aside className="w-64 border-l border-border/50 flex flex-col overflow-hidden">
+          {/* Panel Tabs */}
+          <div className="flex border-b border-border/50 shrink-0">
+            <button
+              onClick={() => setActivePanel('library')}
+              className={`flex-1 py-2.5 text-xs font-medium transition-colors ${
+                activePanel === 'library'
+                  ? 'text-foreground border-b-2 border-primary -mb-px'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Library
+            </button>
+            <button
+              onClick={() => setActivePanel('runner')}
+              className={`flex-1 py-2.5 text-xs font-medium transition-colors ${
+                activePanel === 'runner'
+                  ? 'text-foreground border-b-2 border-primary -mb-px'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Runner
+            </button>
+          </div>
 
-                <TabsContent value="library" className="flex-1 overflow-y-auto p-3 mt-0">
-                  <WorkflowLibrary
-                    onSelect={handleWorkflowSelect}
-                    onNew={handleNewWorkflow}
-                    selectedId={selectedWorkflowId}
-                  />
-                </TabsContent>
-
-                <TabsContent value="run" className="flex-1 overflow-y-auto p-3 mt-0">
-                  <WorkflowRunner
-                    nodes={nodes}
-                    onRun={() => console.log("Running workflow")}
-                    onPause={() => console.log("Paused")}
-                    onStop={() => console.log("Stopped")}
-                    onRestart={() => console.log("Restarting")}
-                  />
-                </TabsContent>
-
-                <TabsContent value="config" className="flex-1 overflow-y-auto p-3 mt-0">
-                  {selectedNodeId ? (
-                    <div className="space-y-4">
-                      <h3 className="text-sm font-medium text-foreground">Node Configuration</h3>
-                      <p className="text-xs text-foreground-secondary">
-                        Configure the selected node's properties and behavior.
-                      </p>
-                      {/* Node-specific config would go here */}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <Settings className="w-8 h-8 text-foreground-tertiary mx-auto mb-2" />
-                      <p className="text-sm text-foreground-secondary">Select a node to configure</p>
-                    </div>
-                  )}
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
-        </div>
+          {/* Panel Content */}
+          <div className="flex-1 overflow-y-auto p-3">
+            {activePanel === 'library' ? (
+              <WorkflowLibrary
+                onSelect={handleWorkflowSelect}
+                onNew={handleNewWorkflow}
+                selectedId={selectedWorkflowId}
+              />
+            ) : (
+              <WorkflowRunner
+                nodes={nodes}
+                onRun={() => console.log("Running workflow")}
+                onPause={() => console.log("Paused")}
+                onStop={() => console.log("Stopped")}
+                onRestart={() => console.log("Restarting")}
+              />
+            )}
+          </div>
+        </aside>
       </div>
     </div>
   );

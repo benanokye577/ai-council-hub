@@ -1,6 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { motion } from "framer-motion";
-import { ZoomIn, ZoomOut, Maximize2, Grid3X3 } from "lucide-react";
+import { ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { WorkflowNode } from "./WorkflowNode";
 import { NodeTemplate } from "./NodePalette";
@@ -31,7 +30,6 @@ export function WorkflowCanvas({
   const canvasRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [showGrid, setShowGrid] = useState(true);
   const [draggingNode, setDraggingNode] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
@@ -53,7 +51,7 @@ export function WorkflowCanvas({
       label: template.label,
       description: template.description,
       icon: template.icon,
-      position: { x: Math.max(0, x - 96), y: Math.max(0, y - 40) },
+      position: { x: Math.max(0, x - 80), y: Math.max(0, y - 32) },
     };
 
     onNodesChange([...nodes, newNode]);
@@ -75,7 +73,6 @@ export function WorkflowCanvas({
       y: e.clientY - rect.top,
     });
 
-    // Set empty image to hide default drag preview
     const img = new Image();
     img.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
     e.dataTransfer.setDragImage(img, 0, 0);
@@ -130,21 +127,26 @@ export function WorkflowCanvas({
     setPan({ x: 0, y: 0 });
   };
 
-  // Draw connections
   const renderConnections = () => (
     <svg 
       className="absolute inset-0 w-full h-full pointer-events-none"
       style={{ transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)` }}
     >
+      <defs>
+        <linearGradient id="connectionGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.6" />
+          <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0.2" />
+        </linearGradient>
+      </defs>
       {connections.map((conn) => {
         const fromNode = nodes.find(n => n.id === conn.from);
         const toNode = nodes.find(n => n.id === conn.to);
         if (!fromNode || !toNode) return null;
 
-        const fromX = fromNode.position.x + 96; // Half width
-        const fromY = fromNode.position.y + 80; // Bottom
-        const toX = toNode.position.x + 96;
-        const toY = toNode.position.y; // Top
+        const fromX = fromNode.position.x + 80;
+        const fromY = fromNode.position.y + 64;
+        const toX = toNode.position.x + 80;
+        const toY = toNode.position.y;
 
         const midY = (fromY + toY) / 2;
 
@@ -153,11 +155,10 @@ export function WorkflowCanvas({
             <path
               d={`M ${fromX} ${fromY} C ${fromX} ${midY}, ${toX} ${midY}, ${toX} ${toY}`}
               fill="none"
-              stroke="hsl(var(--primary))"
+              stroke="url(#connectionGradient)"
               strokeWidth="2"
-              strokeDasharray="4 2"
             />
-            <circle cx={toX} cy={toY} r="4" fill="hsl(var(--primary))" />
+            <circle cx={toX} cy={toY} r="3" fill="hsl(var(--primary))" />
           </g>
         );
       })}
@@ -165,39 +166,37 @@ export function WorkflowCanvas({
   );
 
   return (
-    <div className={cn("relative overflow-hidden bg-background-secondary rounded-lg border border-border", className)}>
-      {/* Toolbar */}
-      <div className="absolute top-3 right-3 z-10 flex items-center gap-1 bg-popover rounded-md border border-border shadow-md p-1">
+    <div className={cn("relative overflow-hidden bg-background", className)}>
+      {/* Dot Grid Pattern */}
+      <div 
+        className="absolute inset-0 opacity-[0.03]"
+        style={{
+          backgroundImage: `radial-gradient(circle, hsl(var(--foreground)) 1px, transparent 1px)`,
+          backgroundSize: '24px 24px',
+        }}
+      />
+
+      {/* Zoom Controls */}
+      <div className="absolute bottom-4 right-4 z-10 flex items-center gap-1 bg-card/80 backdrop-blur-sm rounded-lg border border-border/50 p-1">
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={zoomOut}>
-          <ZoomOut className="w-4 h-4" />
+          <ZoomOut className="w-3.5 h-3.5" />
         </Button>
-        <span className="text-xs text-foreground-secondary w-12 text-center">
+        <span className="text-[10px] text-muted-foreground font-mono w-9 text-center">
           {Math.round(zoom * 100)}%
         </span>
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={zoomIn}>
-          <ZoomIn className="w-4 h-4" />
+          <ZoomIn className="w-3.5 h-3.5" />
         </Button>
-        <div className="w-px h-4 bg-border mx-1" />
+        <div className="w-px h-4 bg-border/50" />
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={resetView}>
-          <Maximize2 className="w-4 h-4" />
-        </Button>
-        <Button 
-          variant={showGrid ? "secondary" : "ghost"} 
-          size="icon" 
-          className="h-7 w-7"
-          onClick={() => setShowGrid(!showGrid)}
-        >
-          <Grid3X3 className="w-4 h-4" />
+          <Maximize2 className="w-3.5 h-3.5" />
         </Button>
       </div>
 
       {/* Canvas */}
       <div
         ref={canvasRef}
-        className={cn(
-          "relative w-full h-full min-h-[500px]",
-          showGrid && "bg-[radial-gradient(hsl(var(--border))_1px,transparent_1px)] [background-size:20px_20px]"
-        )}
+        className="relative w-full h-full"
         style={{
           transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
           transformOrigin: "0 0",
@@ -209,10 +208,8 @@ export function WorkflowCanvas({
         onMouseLeave={handleCanvasMouseUp}
         onClick={() => onNodeSelect(null)}
       >
-        {/* Connections */}
         {renderConnections()}
 
-        {/* Nodes */}
         {nodes.map((node) => (
           <WorkflowNode
             key={node.id}
@@ -226,13 +223,19 @@ export function WorkflowCanvas({
           />
         ))}
 
-        {/* Empty state */}
+        {/* Empty State */}
         {nodes.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-center">
-              <div className="text-4xl mb-3">🔌</div>
-              <p className="text-sm text-foreground-secondary">Drag nodes from the palette</p>
-              <p className="text-xs text-foreground-tertiary mt-1">to start building your workflow</p>
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="text-center max-w-xs">
+              <div className="w-12 h-12 rounded-xl bg-secondary/50 flex items-center justify-center mx-auto mb-4">
+                <div className="w-6 h-6 border-2 border-dashed border-muted-foreground/40 rounded" />
+              </div>
+              <p className="text-sm text-muted-foreground mb-1">
+                Drag components here
+              </p>
+              <p className="text-xs text-muted-foreground/60">
+                Build automations by connecting nodes
+              </p>
             </div>
           </div>
         )}
