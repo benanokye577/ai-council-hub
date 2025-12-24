@@ -45,10 +45,10 @@ const agentData = [
 ];
 
 const modelUsage = [
-  { name: "Claude 3.5 Sonnet", value: 45, color: "hsl(var(--primary))" },
-  { name: "GPT-4o", value: 30, color: "hsl(var(--info))" },
-  { name: "Claude 3 Opus", value: 15, color: "hsl(var(--success))" },
-  { name: "Local Models", value: 10, color: "hsl(var(--warning))" },
+  { name: "Cerebras Llama 3.3", value: 45, color: "hsl(var(--primary))" },
+  { name: "Together Mixtral", value: 30, color: "hsl(var(--info))" },
+  { name: "OpenRouter Claude", value: 15, color: "hsl(var(--success))" },
+  { name: "OpenRouter GPT-4", value: 10, color: "hsl(var(--warning))" },
 ];
 
 const stats = [
@@ -82,6 +82,37 @@ const stats = [
   },
 ];
 
+const valueStats = [
+  {
+    label: "Tasks Completed",
+    value: "156",
+    change: "+23",
+    trend: "up",
+    icon: TrendingUp,
+  },
+  {
+    label: "Hours Saved",
+    value: "48.5h",
+    change: "+12.3h",
+    trend: "up",
+    icon: Clock,
+  },
+  {
+    label: "Value Generated",
+    value: "$2,450",
+    change: "+$680",
+    trend: "up",
+    icon: DollarSign,
+  },
+  {
+    label: "ROI",
+    value: "10,000%",
+    change: "+2,500%",
+    trend: "up",
+    icon: TrendingUp,
+  },
+];
+
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
@@ -107,53 +138,111 @@ export default function Analytics() {
       >
         <h1 className="text-h1 text-foreground mb-2">Analytics</h1>
         <p className="text-foreground-secondary">
-          Track your usage, performance, and costs
+          Track your usage, performance, costs, and value generated
         </p>
       </motion.div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {stats.map((stat, index) => (
-          <motion.div
-            key={stat.label}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.05 }}
-          >
-            <Card variant="gradient-border">
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs text-foreground-secondary mb-1">
-                      {stat.label}
-                    </p>
-                    <p className="text-2xl font-bold text-foreground">
-                      {stat.value}
-                    </p>
-                    <div className="flex items-center gap-1 mt-1">
-                      {stat.trend === "up" ? (
+      {/* Value Stats Grid */}
+      <motion.div
+        className="mb-6"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.05 }}
+      >
+        <h2 className="text-sm font-medium text-foreground-secondary mb-3 flex items-center gap-2">
+          <TrendingUp className="w-4 h-4 text-success" />
+          Value Generated
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {valueStats.map((stat, index) => (
+            <motion.div
+              key={stat.label}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 + index * 0.05 }}
+            >
+              <Card variant="gradient-border" className="border-success/20 bg-success/5">
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-xs text-foreground-secondary mb-1">
+                        {stat.label}
+                      </p>
+                      <p className="text-2xl font-bold text-foreground">
+                        {stat.value}
+                      </p>
+                      <div className="flex items-center gap-1 mt-1">
                         <TrendingUp className="w-3 h-3 text-success" />
-                      ) : (
-                        <TrendingDown className="w-3 h-3 text-error" />
-                      )}
-                      <span
-                        className={`text-xs ${
-                          stat.trend === "up" ? "text-success" : "text-error"
-                        }`}
-                      >
-                        {stat.change}
-                      </span>
+                        <span className="text-xs text-success">
+                          {stat.change}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="w-10 h-10 rounded-lg bg-success/20 flex items-center justify-center">
+                      <stat.icon className="w-5 h-5 text-success" />
                     </div>
                   </div>
-                  <div className="w-10 h-10 rounded-lg bg-gradient-primary flex items-center justify-center">
-                    <stat.icon className="w-5 h-5 text-primary-foreground" />
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
+        </div>
+      </motion.div>
+
+      {/* Cost Stats Grid */}
+      <motion.div
+        className="mb-6"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15 }}
+      >
+        <h2 className="text-sm font-medium text-foreground-secondary mb-3 flex items-center gap-2">
+          <DollarSign className="w-4 h-4 text-foreground-tertiary" />
+          Usage & Costs
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {stats.map((stat, index) => (
+            <motion.div
+              key={stat.label}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 + index * 0.05 }}
+            >
+              <Card variant="gradient-border">
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-xs text-foreground-secondary mb-1">
+                        {stat.label}
+                      </p>
+                      <p className="text-2xl font-bold text-foreground">
+                        {stat.value}
+                      </p>
+                      <div className="flex items-center gap-1 mt-1">
+                        {stat.trend === "up" ? (
+                          <TrendingUp className="w-3 h-3 text-success" />
+                        ) : (
+                          <TrendingDown className="w-3 h-3 text-error" />
+                        )}
+                        <span
+                          className={`text-xs ${
+                            stat.trend === "up" ? "text-success" : "text-error"
+                          }`}
+                        >
+                          {stat.change}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="w-10 h-10 rounded-lg bg-gradient-primary flex items-center justify-center">
+                      <stat.icon className="w-5 h-5 text-primary-foreground" />
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
-      </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
+        </div>
+      </motion.div>
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
