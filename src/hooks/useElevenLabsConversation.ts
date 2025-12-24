@@ -5,6 +5,7 @@ import { toast } from "sonner";
 export type ConversationStatus = 'disconnected' | 'connecting' | 'connected';
 
 interface UseElevenLabsConversationOptions {
+  agentId?: string;
   onTranscript?: (text: string, isFinal: boolean) => void;
   onAgentResponse?: (text: string) => void;
   onError?: (error: Error) => void;
@@ -71,6 +72,7 @@ export function useElevenLabsConversation(options: UseElevenLabsConversationOpti
           'Content-Type': 'application/json',
           ...(supabaseKey ? { 'Authorization': `Bearer ${supabaseKey}` } : {}),
         },
+        body: JSON.stringify({ agentId: options.agentId }),
       });
 
       if (!response.ok) {

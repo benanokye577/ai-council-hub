@@ -13,7 +13,18 @@ serve(async (req) => {
 
   try {
     const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
-    const ELEVENLABS_AGENT_ID = Deno.env.get("ELEVENLABS_AGENT_ID");
+    const DEFAULT_AGENT_ID = Deno.env.get("ELEVENLABS_AGENT_ID");
+
+    // Parse request body for optional agentId override
+    let agentId = DEFAULT_AGENT_ID;
+    try {
+      const body = await req.json();
+      if (body.agentId) {
+        agentId = body.agentId;
+      }
+    } catch {
+      // No body or invalid JSON, use default
+    }
 
     if (!ELEVENLABS_API_KEY) {
       console.error("ELEVENLABS_API_KEY is not configured");
@@ -23,18 +34,18 @@ serve(async (req) => {
       );
     }
 
-    if (!ELEVENLABS_AGENT_ID) {
-      console.error("ELEVENLABS_AGENT_ID is not configured");
+    if (!agentId) {
+      console.error("No agent ID provided and ELEVENLABS_AGENT_ID is not configured");
       return new Response(
         JSON.stringify({ error: "ElevenLabs Agent ID not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log("Fetching conversation token for agent:", ELEVENLABS_AGENT_ID);
+    console.log("Fetching conversation token for agent:", agentId);
 
     const response = await fetch(
-      `https://api.elevenlabs.io/v1/convai/conversation/token?agent_id=${ELEVENLABS_AGENT_ID}`,
+      `https://api.elevenlabs.io/v1/convai/conversation/token?agent_id=${agentId}`,
       {
         headers: {
           "xi-api-key": ELEVENLABS_API_KEY,

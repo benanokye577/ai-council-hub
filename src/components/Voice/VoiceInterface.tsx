@@ -1,7 +1,7 @@
 // Voice Interface with ElevenLabs integration
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, MicOff, Settings, X, Volume2, VolumeX, Loader2, History, Keyboard } from 'lucide-react';
+import { Mic, MicOff, Settings, X, Volume2, VolumeX, Loader2, History, Keyboard, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
@@ -12,6 +12,8 @@ import { useElevenLabsConversation } from '@/hooks/useElevenLabsConversation';
 import { useVoiceSoundEffects } from '@/hooks/useVoiceSoundEffects';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { ConversationHistory, ConversationMessage } from './ConversationHistory';
+import { VoicePersonaSelector } from './VoicePersonaSelector';
+import { VoicePersona, VOICE_PERSONAS } from '@/types/voicePersona';
 
 interface VoiceInterfaceProps {
   onClose?: () => void;
@@ -22,10 +24,12 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
   const [isOrbReady, setIsOrbReady] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showPersonas, setShowPersonas] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [isTabVisible, setIsTabVisible] = useState(true);
   const [conversationHistory, setConversationHistory] = useState<ConversationMessage[]>([]);
+  const [selectedPersona, setSelectedPersona] = useState<VoicePersona>(VOICE_PERSONAS[0]);
   
   // Accessibility
   const systemReducedMotion = useReducedMotion();
@@ -64,6 +68,7 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
     getInputVolume,
     getOutputVolume,
   } = useElevenLabsConversation({
+    agentId: selectedPersona.agentId || undefined,
     onTranscript: (text) => {
       console.log("User transcript:", text);
       if (text) {
@@ -178,7 +183,7 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't trigger if user is typing in an input or if settings is open
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (showSettings || showHistory) return;
+      if (showSettings || showHistory || showPersonas) return;
       
       if (e.code === 'Space' && isOrbReady) {
         e.preventDefault();
@@ -193,7 +198,7 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleToggleConversation, isOrbReady, showSettings, showHistory, onClose]);
+  }, [handleToggleConversation, isOrbReady, showSettings, showHistory, showPersonas, onClose]);
 
   const getStatusText = () => {
     switch (orbState) {
@@ -247,6 +252,15 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-9 w-9 text-muted-foreground hover:text-foreground"
+            onClick={() => setShowPersonas(!showPersonas)}
+            title="Change Persona"
+          >
+            <User className="w-4 h-4" />
+          </Button>
           <Button 
             variant="ghost" 
             size="icon" 
@@ -416,6 +430,41 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
                 className="flex-1"
                 reducedMotion={prefersReducedMotion}
               />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Persona Selector Panel */}
+      <AnimatePresence>
+        {showPersonas && (
+          <motion.div
+            className="absolute inset-0 z-20 bg-background/95 backdrop-blur-lg"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.2 }}
+          >
+            <div className="h-full flex flex-col">
+              <div className="flex items-center justify-between p-4 border-b border-border/30">
+                <div>
+                  <h2 className="text-xl font-semibold">Voice Persona</h2>
+                  <p className="text-sm text-muted-foreground">Choose your AI assistant personality</p>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setShowPersonas(false)}>
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-6">
+                <VoicePersonaSelector
+                  selectedPersona={selectedPersona}
+                  onSelect={(persona) => {
+                    setSelectedPersona(persona);
+                    setShowPersonas(false);
+                  }}
+                  reducedMotion={prefersReducedMotion}
+                />
+              </div>
             </div>
           </motion.div>
         )}
