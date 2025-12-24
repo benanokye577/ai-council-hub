@@ -1,17 +1,6 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
-import { 
-  Play, 
-  Pause, 
-  Square, 
-  RotateCcw, 
-  CheckCircle, 
-  XCircle, 
-  Loader2,
-  Clock
-} from "lucide-react";
+import { Play, Pause, Square, RotateCcw, CheckCircle, XCircle, Loader2, Circle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { WorkflowNodeData } from "@/types/workflow";
 
@@ -23,8 +12,6 @@ interface NodeRunState {
   status: NodeStatus;
   startedAt?: Date;
   completedAt?: Date;
-  error?: string;
-  output?: any;
 }
 
 interface WorkflowRunnerProps {
@@ -48,16 +35,14 @@ export function WorkflowRunner({
   const [nodeStates, setNodeStates] = useState<NodeRunState[]>([]);
   const [currentNodeIndex, setCurrentNodeIndex] = useState(0);
 
-  const progress = nodes.length > 0 
-    ? (nodeStates.filter(n => n.status === 'completed').length / nodes.length) * 100
-    : 0;
+  const completedCount = nodeStates.filter(n => n.status === 'completed').length;
+  const progress = nodes.length > 0 ? (completedCount / nodes.length) * 100 : 0;
 
   const handleRun = () => {
     setStatus('running');
     setNodeStates(nodes.map(n => ({ nodeId: n.id, status: 'pending' as const })));
     setCurrentNodeIndex(0);
     
-    // Simulate execution
     let index = 0;
     const interval = setInterval(() => {
       if (index >= nodes.length) {
@@ -75,7 +60,7 @@ export function WorkflowRunner({
       ));
       setCurrentNodeIndex(index);
       index++;
-    }, 1500);
+    }, 1200);
 
     onRun();
   };
@@ -92,111 +77,132 @@ export function WorkflowRunner({
     onStop();
   };
 
-  const handleRestart = () => {
-    handleStop();
-    handleRun();
-  };
-
   const getStatusIcon = (nodeStatus: NodeStatus) => {
     switch (nodeStatus) {
       case 'pending':
-        return <Clock className="w-3.5 h-3.5 text-foreground-tertiary" />;
+        return <Circle className="w-3 h-3 text-muted-foreground/40" />;
       case 'running':
-        return <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />;
+        return <Loader2 className="w-3 h-3 text-primary animate-spin" />;
       case 'completed':
-        return <CheckCircle className="w-3.5 h-3.5 text-success" />;
+        return <CheckCircle className="w-3 h-3 text-success" />;
       case 'failed':
-        return <XCircle className="w-3.5 h-3.5 text-error" />;
-      case 'skipped':
-        return <div className="w-3.5 h-3.5 rounded-full border border-foreground-tertiary" />;
+        return <XCircle className="w-3 h-3 text-destructive" />;
+      default:
+        return <Circle className="w-3 h-3 text-muted-foreground/20" />;
     }
   };
 
   return (
     <div className={cn("space-y-4", className)}>
+      {/* Status */}
+      {status !== 'idle' && (
+        <div className="flex items-center justify-between text-xs">
+          <span className={cn(
+            "font-medium",
+            status === 'running' && "text-primary",
+            status === 'completed' && "text-success",
+            status === 'failed' && "text-destructive",
+            status === 'paused' && "text-warning"
+          )}>
+            {status === 'running' && "Running..."}
+            {status === 'paused' && "Paused"}
+            {status === 'completed' && "Complete"}
+            {status === 'failed' && "Failed"}
+          </span>
+          <span className="text-muted-foreground font-mono">
+            {completedCount}/{nodes.length}
+          </span>
+        </div>
+      )}
+
+      {/* Progress Bar */}
+      {status !== 'idle' && (
+        <div className="h-1 bg-secondary rounded-full overflow-hidden">
+          <div 
+            className={cn(
+              "h-full transition-all duration-300",
+              status === 'completed' ? "bg-success" : "bg-primary"
+            )}
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      )}
+
       {/* Controls */}
-      <div className="flex items-center gap-2">
+      <div className="flex gap-2">
         {status === 'idle' || status === 'completed' || status === 'failed' ? (
           <Button 
-            className="flex-1 btn-gradient" 
+            className="flex-1 h-8 text-xs" 
             onClick={handleRun}
             disabled={nodes.length === 0}
           >
-            <Play className="w-4 h-4 mr-2" />
-            Run Workflow
+            <Play className="w-3.5 h-3.5 mr-1.5" />
+            {status === 'completed' ? 'Run Again' : 'Run'}
           </Button>
         ) : (
           <>
             {status === 'running' ? (
-              <Button variant="outline" className="flex-1" onClick={handlePause}>
-                <Pause className="w-4 h-4 mr-2" />
+              <Button variant="outline" className="flex-1 h-8 text-xs" onClick={handlePause}>
+                <Pause className="w-3.5 h-3.5 mr-1.5" />
                 Pause
               </Button>
             ) : (
-              <Button className="flex-1 btn-gradient" onClick={handleRun}>
-                <Play className="w-4 h-4 mr-2" />
+              <Button className="flex-1 h-8 text-xs" onClick={handleRun}>
+                <Play className="w-3.5 h-3.5 mr-1.5" />
                 Resume
               </Button>
             )}
-            <Button variant="destructive" onClick={handleStop}>
-              <Square className="w-4 h-4" />
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleStop}>
+              <Square className="w-3.5 h-3.5" />
             </Button>
           </>
         )}
         {(status === 'completed' || status === 'failed') && (
-          <Button variant="outline" onClick={handleRestart}>
-            <RotateCcw className="w-4 h-4" />
+          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => { handleStop(); handleRun(); }}>
+            <RotateCcw className="w-3.5 h-3.5" />
           </Button>
         )}
       </div>
 
-      {/* Progress */}
-      {status !== 'idle' && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-foreground-secondary">
-              {status === 'running' && "Running..."}
-              {status === 'paused' && "Paused"}
-              {status === 'completed' && "Completed"}
-              {status === 'failed' && "Failed"}
-            </span>
-            <span className="text-foreground">{Math.round(progress)}%</span>
-          </div>
-          <Progress value={progress} className="h-2" />
-        </div>
-      )}
-
-      {/* Node Execution Log */}
+      {/* Execution Log */}
       {nodeStates.length > 0 && (
-        <div className="space-y-1 max-h-48 overflow-y-auto">
-          {nodeStates.map((ns, i) => {
+        <div className="space-y-1 pt-2">
+          <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
+            Execution Log
+          </p>
+          {nodeStates.map((ns) => {
             const node = nodes.find(n => n.id === ns.nodeId);
             if (!node) return null;
 
             return (
-              <motion.div
+              <div
                 key={ns.nodeId}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.05 }}
                 className={cn(
-                  "flex items-center gap-2 px-2 py-1.5 rounded text-xs",
-                  ns.status === 'running' && "bg-primary/10",
-                  ns.status === 'completed' && "bg-success/5",
-                  ns.status === 'failed' && "bg-error/10"
+                  "flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors",
+                  ns.status === 'running' && "bg-primary/5",
+                  ns.status === 'completed' && "opacity-60"
                 )}
               >
                 {getStatusIcon(ns.status)}
                 <span className="text-sm">{node.icon}</span>
-                <span className="flex-1 text-foreground truncate">{node.label}</span>
-                {ns.completedAt && (
-                  <span className="text-foreground-tertiary">
-                    {((ns.completedAt.getTime() - (ns.startedAt?.getTime() || 0)) / 1000).toFixed(1)}s
+                <span className="flex-1 text-foreground truncate text-xs">{node.label}</span>
+                {ns.completedAt && ns.startedAt && (
+                  <span className="text-[10px] text-muted-foreground font-mono">
+                    {((ns.completedAt.getTime() - ns.startedAt.getTime()) / 1000).toFixed(1)}s
                   </span>
                 )}
-              </motion.div>
+              </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Empty State */}
+      {nodes.length === 0 && (
+        <div className="text-center py-6">
+          <p className="text-xs text-muted-foreground">
+            Add nodes to run a workflow
+          </p>
         </div>
       )}
     </div>
