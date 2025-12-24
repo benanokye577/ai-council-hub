@@ -14,6 +14,11 @@ import {
   Zap,
   Trash2,
   Download,
+  Calendar,
+  Play,
+  Pause,
+  Plus,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +36,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/contexts/ThemeContext";
+import type { Automation } from "@/types/council";
 
 type AccentColor = "violet" | "blue" | "emerald" | "amber" | "rose";
 
@@ -46,6 +52,7 @@ const settingsTabs = [
   { id: "general", label: "General", icon: User },
   { id: "appearance", label: "Appearance", icon: Palette },
   { id: "models", label: "Models & API Keys", icon: Key },
+  { id: "automations", label: "Automations", icon: Calendar },
   { id: "privacy", label: "Privacy & Data", icon: Shield },
   { id: "shortcuts", label: "Keyboard Shortcuts", icon: Keyboard },
   { id: "about", label: "About", icon: Info },
@@ -58,6 +65,12 @@ const shortcuts = [
   { action: "Send Message", keys: ["⌘", "↵"] },
   { action: "Close Modal", keys: ["Esc"] },
   { action: "Search", keys: ["⌘", "F"] },
+];
+
+const mockAutomations: Automation[] = [
+  { id: "1", name: "Morning Brief", schedule: "9:00 AM daily", enabled: true, type: "morning_brief", lastRun: new Date(Date.now() - 86400000) },
+  { id: "2", name: "Market Scan", schedule: "Every 4 hours", enabled: true, type: "market_scan", lastRun: new Date(Date.now() - 14400000) },
+  { id: "3", name: "Weekly Review", schedule: "Sunday 7:00 PM", enabled: false, type: "weekly_review" },
 ];
 
 export default function Settings() {
@@ -285,17 +298,22 @@ export default function Settings() {
                         Used for all conversations by default
                       </p>
                     </div>
-                    <Select defaultValue="claude-3.5">
+                    <Select defaultValue="cerebras-llama">
                       <SelectTrigger className="w-48">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="claude-3.5">
-                          Claude 3.5 Sonnet
+                        <SelectItem value="cerebras-llama">
+                          Cerebras Llama 3.3 70B
                         </SelectItem>
-                        <SelectItem value="gpt-4o">GPT-4o</SelectItem>
-                        <SelectItem value="claude-3-opus">
-                          Claude 3 Opus
+                        <SelectItem value="together-mistral">
+                          Together Mixtral 8x22B
+                        </SelectItem>
+                        <SelectItem value="openrouter-claude">
+                          OpenRouter Claude 3.5
+                        </SelectItem>
+                        <SelectItem value="openrouter-gpt4">
+                          OpenRouter GPT-4o
                         </SelectItem>
                       </SelectContent>
                     </Select>
@@ -326,26 +344,136 @@ export default function Settings() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label>Anthropic API Key</Label>
+                    <Label>Cerebras API Key</Label>
                     <div className="flex gap-2">
                       <Input
                         type="password"
-                        placeholder="sk-ant-..."
+                        placeholder="csk-..."
                         className="flex-1"
                       />
                       <Button variant="outline">Save</Button>
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label>OpenAI API Key</Label>
+                    <Label>Together AI API Key</Label>
                     <div className="flex gap-2">
                       <Input
                         type="password"
-                        placeholder="sk-..."
+                        placeholder="..."
                         className="flex-1"
                       />
                       <Button variant="outline">Save</Button>
                     </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>OpenRouter API Key</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="password"
+                        placeholder="sk-or-..."
+                        className="flex-1"
+                      />
+                      <Button variant="outline">Save</Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+
+          {/* Automations */}
+          {activeTab === "automations" && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-6"
+            >
+              <div>
+                <h2 className="text-h2 text-foreground mb-2">Automations</h2>
+                <p className="text-foreground-secondary text-sm">
+                  Schedule recurring tasks and automated workflows
+                </p>
+              </div>
+
+              <Card variant="gradient-border">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">Scheduled Tasks</CardTitle>
+                    <Button variant="outline" size="sm" className="gap-1">
+                      <Plus className="w-3 h-3" />
+                      Add Automation
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {mockAutomations.map((automation, index) => (
+                    <motion.div
+                      key={automation.id}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      className="flex items-center justify-between p-3 rounded-lg bg-background-hover/50 border border-border/50"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={cn(
+                          "w-8 h-8 rounded-lg flex items-center justify-center",
+                          automation.enabled ? "bg-primary/20" : "bg-background-hover"
+                        )}>
+                          {automation.enabled ? (
+                            <Play className="w-4 h-4 text-primary" />
+                          ) : (
+                            <Pause className="w-4 h-4 text-foreground-tertiary" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-foreground">
+                            {automation.name}
+                          </p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <Clock className="w-3 h-3 text-foreground-tertiary" />
+                            <span className="text-xs text-foreground-tertiary">
+                              {automation.schedule}
+                            </span>
+                            {automation.lastRun && (
+                              <>
+                                <span className="text-foreground-tertiary">•</span>
+                                <span className="text-xs text-foreground-tertiary">
+                                  Last run: {automation.lastRun.toLocaleDateString()}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <Switch checked={automation.enabled} />
+                    </motion.div>
+                  ))}
+                </CardContent>
+              </Card>
+
+              <Card variant="gradient-border">
+                <CardHeader>
+                  <CardTitle className="text-base">Automation Settings</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>Enable all automations</Label>
+                      <p className="text-xs text-foreground-tertiary">
+                        Master switch for all scheduled tasks
+                      </p>
+                    </div>
+                    <Switch defaultChecked />
+                  </div>
+                  <Separator />
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>Notification on completion</Label>
+                      <p className="text-xs text-foreground-tertiary">
+                        Get notified when automations complete
+                      </p>
+                    </div>
+                    <Switch defaultChecked />
                   </div>
                 </CardContent>
               </Card>

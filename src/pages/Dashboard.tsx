@@ -1,11 +1,13 @@
 import { motion } from "framer-motion";
-import { Search, Code, PenTool, BarChart2, Lightbulb, ArrowRight, Users } from "lucide-react";
+import { Search, Code, PenTool, ArrowRight, Users } from "lucide-react";
 import { AgentCard } from "@/components/dashboard/AgentCard";
 import { QuickChatCard } from "@/components/dashboard/QuickChatCard";
 import { UsageAnalyticsCard } from "@/components/dashboard/UsageAnalyticsCard";
 import { RecentConversationsCard } from "@/components/dashboard/RecentConversationsCard";
 import { KnowledgeBaseCard } from "@/components/dashboard/KnowledgeBaseCard";
 import { SystemStatusCard } from "@/components/dashboard/SystemStatusCard";
+import { TodaysFocusCard } from "@/components/dashboard/TodaysFocusCard";
+import { CouncilRecommendationsCard } from "@/components/dashboard/CouncilRecommendationsCard";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 
@@ -55,12 +57,30 @@ export default function Dashboard() {
         </p>
       </motion.div>
 
+      {/* Today's Focus + Council Recommendations Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+        >
+          <TodaysFocusCard />
+        </motion.div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <CouncilRecommendationsCard />
+        </motion.div>
+      </div>
+
       {/* Active Agents Section */}
       <motion.section
         className="mb-6"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.05 }}
+        transition={{ delay: 0.15 }}
       >
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
@@ -83,7 +103,7 @@ export default function Dashboard() {
               key={agent.name}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 + index * 0.05 }}
+              transition={{ delay: 0.2 + index * 0.05 }}
             >
               <AgentCard {...agent} onClick={() => navigate("/chat")} />
             </motion.div>
