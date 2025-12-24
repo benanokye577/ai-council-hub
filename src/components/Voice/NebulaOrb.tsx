@@ -301,6 +301,8 @@ export function NebulaOrb({ state, shape, audioLevel = 0, onReady }: NebulaOrbPr
     material: THREE.ShaderMaterial;
     geometry: THREE.BufferGeometry;
     maxParticles: number;
+    currentParticles: number;
+    targetParticles: number;
     animationId: number;
   } | null>(null);
   
@@ -398,6 +400,8 @@ export function NebulaOrb({ state, shape, audioLevel = 0, onReady }: NebulaOrbPr
       material,
       geometry,
       maxParticles: particleCount,
+      currentParticles: particleCount,
+      targetParticles: particleCount,
       animationId: 0
     };
 
@@ -406,13 +410,22 @@ export function NebulaOrb({ state, shape, audioLevel = 0, onReady }: NebulaOrbPr
     const animate = (currentTime: number) => {
       if (!sceneRef.current) return;
       
-      const { renderer: r, scene: s, camera: cam, particles: p, material: m } = sceneRef.current;
+      const { renderer: r, scene: s, camera: cam, particles: p, material: m, geometry: geo } = sceneRef.current;
       
       // Use delta time for consistent animation speed
       const deltaTime = (currentTime - lastTime) / 1000;
       lastTime = currentTime;
       
       m.uniforms.uTime.value += deltaTime;
+      
+      // Smooth LOD transition - lerp towards target particle count
+      const lerpSpeed = 3.0; // Particles per second multiplier
+      const diff = sceneRef.current.targetParticles - sceneRef.current.currentParticles;
+      if (Math.abs(diff) > 10) {
+        // Smoothly interpolate particle count
+        sceneRef.current.currentParticles += diff * Math.min(deltaTime * lerpSpeed, 1);
+        geo.setDrawRange(0, Math.round(sceneRef.current.currentParticles));
+      }
       
       // Gentle rotation
       p.rotation.y += 0.002 * deltaTime * 60;
@@ -445,10 +458,10 @@ export function NebulaOrb({ state, shape, audioLevel = 0, onReady }: NebulaOrbPr
       sceneRef.current.camera.updateProjectionMatrix();
       sceneRef.current.renderer.setSize(w, h);
       
-      // Dynamic LOD adjustment on resize
+      // Dynamic LOD adjustment on resize - set target for smooth transition
       const minSize = Math.min(w, h);
-      const targetParticles = Math.min(getLODCount(minSize), sceneRef.current.maxParticles);
-      sceneRef.current.geometry.setDrawRange(0, targetParticles);
+      const newTargetParticles = Math.min(getLODCount(minSize), sceneRef.current.maxParticles);
+      sceneRef.current.targetParticles = newTargetParticles;
     };
 
     window.addEventListener('resize', handleResize);
