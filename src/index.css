@@ -94,6 +94,21 @@
     --sidebar-width: 260px;
     --sidebar-collapsed: 64px;
     --topbar-height: 56px;
+    
+    /* Voice Mode Colors */
+    --voice-listening: 187 80% 50%;
+    --voice-processing: 263 70% 65%;
+    --voice-speaking: 142 60% 45%;
+    
+    /* Focus Mode Colors */
+    --focus-work: 239 84% 67%;
+    --focus-break: 168 76% 42%;
+    
+    /* Workflow Colors */
+    --workflow-trigger: 38 92% 50%;
+    --workflow-condition: 263 70% 58%;
+    --workflow-action: 187 80% 50%;
+    --workflow-ai: 330 81% 60%;
   }
 }
 
