@@ -23,6 +23,11 @@ const accentColors: Record<AccentColor, { primary: string; primaryLight: string 
   rose: { primary: "350 89% 60%", primaryLight: "347 77% 68%" },
 };
 
+// Generate gradient mesh CSS using HSL values
+const generateGradientMesh = (primary: string, primaryLight: string): string => {
+  return `radial-gradient(at 40% 20%, hsl(${primary} / 0.15) 0px, transparent 50%), radial-gradient(at 80% 0%, hsl(${primaryLight} / 0.1) 0px, transparent 50%), radial-gradient(at 0% 50%, hsl(${primary} / 0.08) 0px, transparent 50%)`;
+};
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [accentColor, setAccentColorState] = useState<AccentColor>(() => {
     const saved = localStorage.getItem("accent-color");
@@ -47,6 +52,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     root.style.setProperty("--card-glow", colors.primary);
     root.style.setProperty("--sidebar-primary", colors.primary);
     root.style.setProperty("--sidebar-ring", colors.primary);
+    
+    // Update background mesh gradient
+    const gradientMesh = generateGradientMesh(colors.primary, colors.primaryLight);
+    root.style.setProperty("--gradient-mesh", gradientMesh);
   }, [accentColor]);
 
   return (
