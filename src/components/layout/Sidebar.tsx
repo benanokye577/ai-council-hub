@@ -14,6 +14,11 @@ import {
   Code,
   PenTool,
   Crown,
+  Sunrise,
+  Timer,
+  Mic,
+  Puzzle,
+  Monitor,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -45,9 +50,14 @@ export const useSidebar = () => useContext(SidebarContext);
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
+  { icon: Sunrise, label: "Daily Brief", path: "/brief" },
   { icon: MessageSquare, label: "Chat", path: "/chat" },
   { icon: Users, label: "Agents", path: "/agents", badge: "5" },
-  { icon: BookOpen, label: "Knowledge Base", path: "/knowledge" },
+  { icon: Timer, label: "Focus", path: "/focus" },
+  { icon: Mic, label: "Voice", path: "/voice" },
+  { icon: Monitor, label: "Automation", path: "/automation" },
+  { icon: Puzzle, label: "MCP", path: "/mcp" },
+  { icon: BookOpen, label: "Knowledge", path: "/knowledge" },
   { icon: BarChart3, label: "Analytics", path: "/analytics" },
   { icon: Wrench, label: "Tools", path: "/tools" },
   { icon: Settings, label: "Settings", path: "/settings" },
