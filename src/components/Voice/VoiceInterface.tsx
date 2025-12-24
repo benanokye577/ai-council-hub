@@ -14,6 +14,10 @@ import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { ConversationHistory, ConversationMessage } from './ConversationHistory';
 import { VoicePersonaSelector } from './VoicePersonaSelector';
 import { VoicePersona, VOICE_PERSONAS } from '@/types/voicePersona';
+import { SessionStats } from './SessionStats';
+import { QuickActions } from './QuickActions';
+import { ConversationExport } from './ConversationExport';
+import { VoiceWaveform } from './VoiceWaveform';
 
 interface VoiceInterfaceProps {
   onClose?: () => void;
@@ -329,9 +333,25 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
           />
         </motion.div>
 
+        {/* Session Stats - shown when active */}
+        {isConnected && (
+          <SessionStats 
+            isActive={isConnected} 
+            messages={conversationHistory} 
+            className="mt-4"
+          />
+        )}
+
+        {/* Waveform visualization */}
+        {isConnected && (
+          <div className="mt-4 w-full max-w-sm">
+            <VoiceWaveform isActive={isSpeaking || audioLevel > 0.1} barCount={24} color="cyan" />
+          </div>
+        )}
+
         {/* Status */}
         <motion.div 
-          className="mt-8 text-center"
+          className="mt-6 text-center"
           {...motionProps}
         >
           <p className="text-lg font-medium text-foreground/90 mb-1">
@@ -345,6 +365,16 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
             </div>
           )}
         </motion.div>
+
+        {/* Quick Actions - shown when idle */}
+        {orbState === 'idle' && isOrbReady && (
+          <QuickActions
+            onAction={(prompt) => console.log('Quick action:', prompt)}
+            disabled={!isOrbReady}
+            reducedMotion={prefersReducedMotion}
+            className="mt-6"
+          />
+        )}
 
         {/* Current Transcript/Response */}
         <AnimatePresence mode="wait">
@@ -421,9 +451,12 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
             <div className="h-full flex flex-col">
               <div className="flex items-center justify-between p-4 border-b border-border/30">
                 <h2 className="text-xl font-semibold">Conversation History</h2>
-                <Button variant="ghost" size="icon" onClick={() => setShowHistory(false)}>
-                  <X className="w-5 h-5" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  <ConversationExport messages={conversationHistory} />
+                  <Button variant="ghost" size="icon" onClick={() => setShowHistory(false)}>
+                    <X className="w-5 h-5" />
+                  </Button>
+                </div>
               </div>
               <ConversationHistory 
                 messages={conversationHistory} 
