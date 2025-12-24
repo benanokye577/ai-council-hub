@@ -1,6 +1,10 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import * as THREE from 'three';
 import { gsap } from 'gsap';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 
 export type OrbState = 'idle' | 'listening' | 'processing' | 'speaking';
 export type OrbShape = 'sphere' | 'heart' | 'saturn' | 'torus' | 'spiral';
@@ -9,6 +13,7 @@ interface NebulaOrbProps {
   state: OrbState;
   shape?: OrbShape;
   audioLevel?: number;
+  bloomIntensity?: number;
   onReady?: () => void;
 }
 
@@ -143,12 +148,15 @@ const vertexShader = `
     vec3 baseColor = mix(uColorA, uColorB, colorMix);
     vColor = mix(baseColor, uColorC, colorMix2 * 0.4 + uAudioLevel * 0.3);
     
+    // Boost color intensity for bloom
+    vColor *= 1.2 + uAudioLevel * 0.5;
+    
     vAlpha = 0.5 + aRandom * 0.5;
     vDepth = -mvPosition.z;
   }
 `;
 
-// Fragment shader with soft glow
+// Fragment shader with enhanced glow for bloom
 const fragmentShader = `
   varying vec3 vColor;
   varying float vAlpha;
@@ -158,18 +166,20 @@ const fragmentShader = `
     float dist = length(gl_PointCoord - vec2(0.5));
     if (dist > 0.5) discard;
     
-    // Soft circular gradient
+    // Soft circular gradient with hot center
     float alpha = 1.0 - smoothstep(0.0, 0.5, dist);
-    alpha = pow(alpha, 1.5) * vAlpha;
+    alpha = pow(alpha, 1.3) * vAlpha;
     
-    // Add inner glow
-    float glow = 1.0 - smoothstep(0.0, 0.3, dist);
-    vec3 finalColor = vColor + vColor * glow * 0.4;
+    // Inner glow intensity for bloom pickup
+    float glow = 1.0 - smoothstep(0.0, 0.25, dist);
+    glow = pow(glow, 2.0);
+    
+    vec3 finalColor = vColor + vColor * glow * 0.6;
     
     // Depth-based fade
-    float depthFade = clamp(vDepth / 5.0, 0.3, 1.0);
+    float depthFade = clamp(vDepth / 5.0, 0.4, 1.0);
     
-    gl_FragColor = vec4(finalColor, alpha * 0.65 * depthFade);
+    gl_FragColor = vec4(finalColor, alpha * 0.7 * depthFade);
   }
 `;
 
@@ -192,15 +202,11 @@ function generateHeart(count: number, scale: number): Float32Array {
   const positions = new Float32Array(count * 3);
   for (let i = 0; i < count; i++) {
     const t = (i / count) * Math.PI * 2;
-    const u = Math.random() * Math.PI * 2;
-    const v = Math.random() * 2 - 1;
     
-    // 3D heart parametric equation
     const x = 16 * Math.pow(Math.sin(t), 3);
     const y = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
     const z = (Math.random() - 0.5) * 8;
     
-    // Add volume with noise
     const jitter = 0.15;
     positions[i * 3] = (x / 16) * scale + (Math.random() - 0.5) * jitter;
     positions[i * 3 + 1] = (y / 16) * scale + (Math.random() - 0.5) * jitter;
@@ -213,23 +219,21 @@ function generateSaturn(count: number, planetRadius: number, ringRadius: number)
   const positions = new Float32Array(count * 3);
   const planetParticles = Math.floor(count * 0.4);
   
-  // Planet (sphere)
   for (let i = 0; i < planetParticles; i++) {
     const phi = Math.acos(-1 + (2 * i) / planetParticles);
     const theta = Math.sqrt(planetParticles * Math.PI) * phi;
     
     positions[i * 3] = planetRadius * Math.cos(theta) * Math.sin(phi);
-    positions[i * 3 + 1] = planetRadius * Math.sin(theta) * Math.sin(phi) * 0.8; // Slightly flattened
+    positions[i * 3 + 1] = planetRadius * Math.sin(theta) * Math.sin(phi) * 0.8;
     positions[i * 3 + 2] = planetRadius * Math.cos(phi);
   }
   
-  // Rings
   for (let i = planetParticles; i < count; i++) {
     const angle = Math.random() * Math.PI * 2;
     const ringDist = ringRadius + (Math.random() - 0.5) * 0.4;
     
     positions[i * 3] = Math.cos(angle) * ringDist;
-    positions[i * 3 + 1] = (Math.random() - 0.5) * 0.05; // Thin ring
+    positions[i * 3 + 1] = (Math.random() - 0.5) * 0.05;
     positions[i * 3 + 2] = Math.sin(angle) * ringDist;
   }
   return positions;
@@ -271,33 +275,43 @@ function generateSpiral(count: number, radius: number, height: number): Float32A
 // Color palettes for different states
 const colorPalettes = {
   idle: {
-    colorA: new THREE.Color(0.3, 0.15, 0.6),   // Deep purple
-    colorB: new THREE.Color(0.1, 0.4, 0.7),    // Blue
-    colorC: new THREE.Color(0.5, 0.2, 0.5),    // Magenta
+    colorA: new THREE.Color(0.35, 0.18, 0.7),
+    colorB: new THREE.Color(0.15, 0.45, 0.8),
+    colorC: new THREE.Color(0.55, 0.25, 0.6),
   },
   listening: {
-    colorA: new THREE.Color(0.1, 0.5, 0.7),    // Cyan
-    colorB: new THREE.Color(0.2, 0.7, 0.6),    // Teal
-    colorC: new THREE.Color(0.1, 0.3, 0.6),    // Deep blue
+    colorA: new THREE.Color(0.1, 0.55, 0.8),
+    colorB: new THREE.Color(0.2, 0.75, 0.7),
+    colorC: new THREE.Color(0.1, 0.35, 0.7),
   },
   processing: {
-    colorA: new THREE.Color(0.6, 0.3, 0.7),    // Violet
-    colorB: new THREE.Color(0.8, 0.2, 0.5),    // Pink
-    colorC: new THREE.Color(0.4, 0.1, 0.6),    // Purple
+    colorA: new THREE.Color(0.65, 0.35, 0.8),
+    colorB: new THREE.Color(0.9, 0.25, 0.55),
+    colorC: new THREE.Color(0.45, 0.15, 0.7),
   },
   speaking: {
-    colorA: new THREE.Color(0.2, 0.6, 0.4),    // Green
-    colorB: new THREE.Color(0.1, 0.7, 0.6),    // Emerald
-    colorC: new THREE.Color(0.3, 0.8, 0.5),    // Mint
+    colorA: new THREE.Color(0.25, 0.7, 0.5),
+    colorB: new THREE.Color(0.15, 0.8, 0.7),
+    colorC: new THREE.Color(0.35, 0.9, 0.6),
   },
 };
 
-export function NebulaOrb({ state, shape, audioLevel = 0, onReady }: NebulaOrbProps) {
+// Bloom settings per state
+const bloomSettings = {
+  idle: { strength: 1.2, radius: 0.6, threshold: 0.3 },
+  listening: { strength: 1.6, radius: 0.7, threshold: 0.25 },
+  processing: { strength: 2.0, radius: 0.8, threshold: 0.2 },
+  speaking: { strength: 1.8, radius: 0.75, threshold: 0.22 },
+};
+
+export function NebulaOrb({ state, shape, audioLevel = 0, bloomIntensity = 1, onReady }: NebulaOrbProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<{
     scene: THREE.Scene;
     camera: THREE.PerspectiveCamera;
     renderer: THREE.WebGLRenderer;
+    composer: EffectComposer;
+    bloomPass: UnrealBloomPass;
     particles: THREE.Points;
     material: THREE.ShaderMaterial;
     animationId: number;
@@ -324,10 +338,29 @@ export function NebulaOrb({ state, shape, audioLevel = 0, onReady }: NebulaOrbPr
     });
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2;
     container.appendChild(renderer.domElement);
 
+    // Post-processing setup
+    const composer = new EffectComposer(renderer);
+    
+    const renderPass = new RenderPass(scene, camera);
+    composer.addPass(renderPass);
+    
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(width, height),
+      1.2,  // strength
+      0.6,  // radius
+      0.3   // threshold
+    );
+    composer.addPass(bloomPass);
+    
+    const outputPass = new OutputPass();
+    composer.addPass(outputPass);
+
     // Generate all shapes
-    const particleCount = 40000;
+    const particleCount = 45000;
     const geometry = new THREE.BufferGeometry();
     
     const sphere = generateSphere(particleCount, 1);
@@ -362,9 +395,9 @@ export function NebulaOrb({ state, shape, audioLevel = 0, onReady }: NebulaOrbPr
         uMorphTorus: { value: 0 },
         uMorphSpiral: { value: 0 },
         uPulse: { value: 0 },
-        uColorA: { value: palette.colorA },
-        uColorB: { value: palette.colorB },
-        uColorC: { value: palette.colorC },
+        uColorA: { value: palette.colorA.clone() },
+        uColorB: { value: palette.colorB.clone() },
+        uColorC: { value: palette.colorC.clone() },
       },
       transparent: true,
       blending: THREE.AdditiveBlending,
@@ -378,6 +411,8 @@ export function NebulaOrb({ state, shape, audioLevel = 0, onReady }: NebulaOrbPr
       scene,
       camera,
       renderer,
+      composer,
+      bloomPass,
       particles,
       material,
       animationId: 0
@@ -388,17 +423,23 @@ export function NebulaOrb({ state, shape, audioLevel = 0, onReady }: NebulaOrbPr
     const animate = () => {
       if (!sceneRef.current) return;
       
-      const { renderer: r, scene: s, camera: c, particles: p, material: m } = sceneRef.current;
+      const { composer: c, particles: p, material: m, bloomPass: bp } = sceneRef.current;
       
       time += 0.016;
       m.uniforms.uTime.value = time;
+      
+      // Dynamic bloom based on audio
+      const audioBoost = m.uniforms.uAudioLevel.value;
+      bp.strength = bp.strength + (audioBoost * 0.3);
       
       // Gentle rotation
       p.rotation.y += 0.002;
       p.rotation.x = Math.sin(time * 0.1) * 0.15;
       p.rotation.z = Math.cos(time * 0.08) * 0.05;
       
-      r.render(s, c);
+      // Render with post-processing
+      c.render();
+      
       sceneRef.current.animationId = requestAnimationFrame(animate);
     };
 
@@ -413,6 +454,7 @@ export function NebulaOrb({ state, shape, audioLevel = 0, onReady }: NebulaOrbPr
       sceneRef.current.camera.aspect = w / h;
       sceneRef.current.camera.updateProjectionMatrix();
       sceneRef.current.renderer.setSize(w, h);
+      sceneRef.current.composer.setSize(w, h);
     };
 
     window.addEventListener('resize', handleResize);
@@ -429,6 +471,7 @@ export function NebulaOrb({ state, shape, audioLevel = 0, onReady }: NebulaOrbPr
       cleanup?.();
       if (sceneRef.current) {
         cancelAnimationFrame(sceneRef.current.animationId);
+        sceneRef.current.composer.dispose();
         sceneRef.current.renderer.dispose();
         sceneRef.current.particles.geometry.dispose();
         (sceneRef.current.particles.material as THREE.Material).dispose();
@@ -448,22 +491,34 @@ export function NebulaOrb({ state, shape, audioLevel = 0, onReady }: NebulaOrbPr
     });
   }, [audioLevel]);
 
-  // Handle state transitions with shape morphing
+  // Update bloom intensity
+  useEffect(() => {
+    if (!sceneRef.current) return;
+    const baseSettings = bloomSettings[state];
+    gsap.to(sceneRef.current.bloomPass, {
+      strength: baseSettings.strength * bloomIntensity,
+      duration: 0.5,
+      ease: 'power2.out'
+    });
+  }, [bloomIntensity, state]);
+
+  // Handle state transitions with shape morphing and bloom
   useEffect(() => {
     if (!sceneRef.current) return;
     
-    const { material } = sceneRef.current;
+    const { material, bloomPass } = sceneRef.current;
     const u = material.uniforms;
     const palette = colorPalettes[state];
+    const bloom = bloomSettings[state];
     
-    // Reset all morphs first
-    const resetMorphs = {
-      uMorphSphere: 0,
-      uMorphHeart: 0,
-      uMorphSaturn: 0,
-      uMorphTorus: 0,
-      uMorphSpiral: 0,
-    };
+    // Transition bloom settings
+    gsap.to(bloomPass, {
+      strength: bloom.strength * bloomIntensity,
+      radius: bloom.radius,
+      threshold: bloom.threshold,
+      duration: 1,
+      ease: 'power2.inOut'
+    });
     
     // Transition colors
     gsap.to(u.uColorA.value, { r: palette.colorA.r, g: palette.colorA.g, b: palette.colorA.b, duration: 1.2 });
@@ -472,7 +527,6 @@ export function NebulaOrb({ state, shape, audioLevel = 0, onReady }: NebulaOrbPr
     
     switch (state) {
       case 'idle':
-        // Sphere shape
         gsap.to(u.uMorphSphere, { value: 1, duration: 1.5, ease: 'power3.inOut' });
         gsap.to(u.uMorphHeart, { value: 0, duration: 1.2, ease: 'power3.inOut' });
         gsap.to(u.uMorphSaturn, { value: 0, duration: 1.2, ease: 'power3.inOut' });
@@ -482,7 +536,6 @@ export function NebulaOrb({ state, shape, audioLevel = 0, onReady }: NebulaOrbPr
         break;
         
       case 'listening':
-        // Torus (ring) - represents "receiving"
         gsap.to(u.uMorphSphere, { value: 0, duration: 1, ease: 'power2.inOut' });
         gsap.to(u.uMorphTorus, { value: 1, duration: 1.2, ease: 'power3.out' });
         gsap.to(u.uMorphHeart, { value: 0, duration: 1, ease: 'power2.inOut' });
@@ -492,13 +545,11 @@ export function NebulaOrb({ state, shape, audioLevel = 0, onReady }: NebulaOrbPr
         break;
         
       case 'processing':
-        // Spiral - represents "thinking"
         gsap.to(u.uMorphSphere, { value: 0, duration: 0.8, ease: 'power2.inOut' });
         gsap.to(u.uMorphSpiral, { value: 1, duration: 1, ease: 'power3.out' });
         gsap.to(u.uMorphTorus, { value: 0, duration: 0.8, ease: 'power2.inOut' });
         gsap.to(u.uMorphHeart, { value: 0, duration: 0.8, ease: 'power2.inOut' });
         gsap.to(u.uMorphSaturn, { value: 0, duration: 0.8, ease: 'power2.inOut' });
-        // Pulsing animation
         gsap.to(u.uPulse, { 
           value: 1, 
           duration: 0.3, 
@@ -509,7 +560,6 @@ export function NebulaOrb({ state, shape, audioLevel = 0, onReady }: NebulaOrbPr
         break;
         
       case 'speaking':
-        // Saturn - represents "broadcasting/speaking"
         gsap.to(u.uMorphSphere, { value: 0, duration: 1, ease: 'power2.inOut' });
         gsap.to(u.uMorphSaturn, { value: 1, duration: 1.4, ease: 'power3.out' });
         gsap.to(u.uMorphSpiral, { value: 0, duration: 1, ease: 'power2.inOut' });
@@ -519,7 +569,7 @@ export function NebulaOrb({ state, shape, audioLevel = 0, onReady }: NebulaOrbPr
         gsap.to(u.uPulse, { value: 0.3, duration: 0.5 });
         break;
     }
-  }, [state]);
+  }, [state, bloomIntensity]);
 
   // Handle explicit shape override
   useEffect(() => {
@@ -528,7 +578,6 @@ export function NebulaOrb({ state, shape, audioLevel = 0, onReady }: NebulaOrbPr
     const { material } = sceneRef.current;
     const u = material.uniforms;
     
-    // Kill any existing animations
     gsap.killTweensOf([u.uMorphSphere, u.uMorphHeart, u.uMorphSaturn, u.uMorphTorus, u.uMorphSpiral]);
     
     const morphTargets = {
