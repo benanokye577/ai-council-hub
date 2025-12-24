@@ -1,7 +1,7 @@
 // Voice Interface with ElevenLabs integration
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, MicOff, Settings, X, Volume2, VolumeX, Loader2 } from 'lucide-react';
+import { Mic, MicOff, Settings, X, Volume2, VolumeX, Loader2, History, Keyboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
@@ -9,6 +9,9 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { NebulaOrb, OrbState } from './NebulaOrb';
 import { useElevenLabsConversation } from '@/hooks/useElevenLabsConversation';
+import { useVoiceSoundEffects } from '@/hooks/useVoiceSoundEffects';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
+import { ConversationHistory, ConversationMessage } from './ConversationHistory';
 
 interface VoiceInterfaceProps {
   onClose?: () => void;
@@ -18,8 +21,14 @@ interface VoiceInterfaceProps {
 export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
   const [isOrbReady, setIsOrbReady] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
+  const [isTabVisible, setIsTabVisible] = useState(true);
+  const [conversationHistory, setConversationHistory] = useState<ConversationMessage[]>([]);
+  
+  // Accessibility
+  const systemReducedMotion = useReducedMotion();
   
   // Settings state
   const [settings, setSettings] = useState({
@@ -29,8 +38,18 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
     hapticFeedback: true,
     noiseReduction: true,
     wakeWord: false,
-    continuousMode: false
+    continuousMode: false,
+    soundEffects: true,
+    reducedMotion: false,
   });
+
+  const prefersReducedMotion = systemReducedMotion || settings.reducedMotion;
+  
+  // Sound effects hook
+  const { playSound, triggerHaptic } = useVoiceSoundEffects(settings.soundEffects);
+
+  // Track previous state for sound effects
+  const prevStateRef = useRef<OrbState>('idle');
 
   // ElevenLabs conversation hook
   const {
@@ -47,11 +66,30 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
   } = useElevenLabsConversation({
     onTranscript: (text) => {
       console.log("User transcript:", text);
+      if (text) {
+        addMessage('user', text);
+      }
     },
     onAgentResponse: (text) => {
       console.log("Agent response:", text);
+      if (text) {
+        addMessage('assistant', text);
+      }
     },
   });
+
+  // Add message to history
+  const addMessage = useCallback((role: 'user' | 'assistant', content: string) => {
+    setConversationHistory(prev => [
+      ...prev,
+      {
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        role,
+        content,
+        timestamp: new Date(),
+      }
+    ]);
+  }, []);
 
   // Derive orb state from ElevenLabs conversation status
   const orbState: OrbState = (() => {
@@ -61,19 +99,54 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
     return 'listening';
   })();
 
+  // Play sounds and haptics on state change
+  useEffect(() => {
+    if (orbState !== prevStateRef.current) {
+      switch (orbState) {
+        case 'listening':
+          if (prevStateRef.current === 'idle') {
+            playSound('start');
+            if (settings.hapticFeedback) triggerHaptic('medium');
+          } else {
+            playSound('listening');
+          }
+          break;
+        case 'speaking':
+          playSound('speaking');
+          if (settings.hapticFeedback) triggerHaptic('light');
+          break;
+        case 'idle':
+          if (prevStateRef.current !== 'idle') {
+            playSound('stop');
+            if (settings.hapticFeedback) triggerHaptic('light');
+          }
+          break;
+      }
+      prevStateRef.current = orbState;
+    }
+  }, [orbState, playSound, triggerHaptic, settings.hapticFeedback]);
+
+  // Visibility API - pause rendering when tab is hidden
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsTabVisible(!document.hidden);
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
   // Audio level animation for visualization
   const animationRef = useRef<number>(0);
 
   useEffect(() => {
-    if (isConnected) {
+    if (isConnected && isTabVisible) {
       const updateAudioLevel = () => {
         try {
           const inputLevel = getInputVolume?.() || 0;
           const outputLevel = getOutputVolume?.() || 0;
-          // Use whichever is higher for visualization
           setAudioLevel(Math.max(inputLevel, outputLevel));
         } catch {
-          // Fallback if volume methods aren't available
           if (isSpeaking) {
             setAudioLevel(Math.random() * 0.6 + 0.2);
           } else {
@@ -90,15 +163,37 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
     return () => {
       cancelAnimationFrame(animationRef.current);
     };
-  }, [isConnected, isSpeaking, getInputVolume, getOutputVolume]);
+  }, [isConnected, isSpeaking, getInputVolume, getOutputVolume, isTabVisible]);
 
-  const handleToggleConversation = async () => {
+  const handleToggleConversation = useCallback(async () => {
     if (isConnected || isConnecting) {
       await stopConversation();
     } else {
       await startConversation();
     }
-  };
+  }, [isConnected, isConnecting, startConversation, stopConversation]);
+
+  // Keyboard shortcut - Spacebar to toggle
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if user is typing in an input or if settings is open
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (showSettings || showHistory) return;
+      
+      if (e.code === 'Space' && isOrbReady) {
+        e.preventDefault();
+        handleToggleConversation();
+      }
+      
+      // Escape to close
+      if (e.code === 'Escape' && onClose) {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleToggleConversation, isOrbReady, showSettings, showHistory, onClose]);
 
   const getStatusText = () => {
     switch (orbState) {
@@ -109,26 +204,57 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
     }
   };
 
+  // Animation variants based on reduced motion preference
+  const motionProps = prefersReducedMotion ? {
+    initial: { opacity: 1 },
+    animate: { opacity: 1 },
+    exit: { opacity: 0 },
+    transition: { duration: 0 }
+  } : {
+    initial: { opacity: 0, y: 20 },
+    animate: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: -10 },
+    transition: { duration: 0.4 }
+  };
+
   return (
     <div className={cn(
       "relative w-full h-full flex flex-col overflow-hidden",
       "bg-gradient-to-b from-[hsl(260,30%,8%)] via-[hsl(260,25%,6%)] to-[hsl(260,20%,4%)]",
       className
     )}>
-      {/* Ambient glow effects */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-primary/5 blur-[120px]" />
-        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] rounded-full bg-[hsl(187,80%,50%)]/5 blur-[100px]" />
-        <div className="absolute bottom-1/4 right-0 w-[300px] h-[300px] rounded-full bg-[hsl(330,81%,60%)]/5 blur-[80px]" />
-      </div>
+      {/* Ambient glow effects - hidden in reduced motion mode */}
+      {!prefersReducedMotion && (
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-primary/5 blur-[120px]" />
+          <div className="absolute bottom-0 left-0 w-[400px] h-[400px] rounded-full bg-[hsl(187,80%,50%)]/5 blur-[100px]" />
+          <div className="absolute bottom-1/4 right-0 w-[300px] h-[300px] rounded-full bg-[hsl(330,81%,60%)]/5 blur-[80px]" />
+        </div>
+      )}
 
       {/* Header */}
       <header className="relative z-10 flex items-center justify-between p-4">
         <div className="flex items-center gap-3">
-          <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
+          <div className={cn(
+            "w-2 h-2 rounded-full bg-success",
+            !prefersReducedMotion && "animate-pulse"
+          )} />
           <span className="text-sm font-medium text-foreground/80">Voice Active</span>
+          {/* Keyboard hint */}
+          <div className="hidden sm:flex items-center gap-1 ml-2 px-2 py-0.5 rounded bg-secondary/30 border border-border/30">
+            <Keyboard className="w-3 h-3 text-muted-foreground" />
+            <span className="text-[10px] text-muted-foreground">Space</span>
+          </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-9 w-9 text-muted-foreground hover:text-foreground"
+            onClick={() => setShowHistory(!showHistory)}
+          >
+            <History className="w-4 h-4" />
+          </Button>
           <Button 
             variant="ghost" 
             size="icon" 
@@ -155,14 +281,16 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
         {/* Orb container */}
         <motion.div 
           className="relative w-72 h-72 sm:w-80 sm:h-80 md:w-96 md:h-96"
-          initial={{ scale: 0.8, opacity: 0 }}
+          initial={prefersReducedMotion ? {} : { scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
+          transition={prefersReducedMotion ? { duration: 0 } : { duration: 1, ease: [0.16, 1, 0.3, 1] }}
         >
           <NebulaOrb 
             state={orbState} 
             audioLevel={audioLevel}
             onReady={() => setIsOrbReady(true)}
+            paused={!isTabVisible}
+            reducedMotion={prefersReducedMotion}
           />
           
           {/* Loading overlay */}
@@ -171,9 +299,9 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
               <motion.div 
                 className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm rounded-full"
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.5 }}
+                transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
               >
-                <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                <Loader2 className={cn("w-8 h-8 text-primary", !prefersReducedMotion && "animate-spin")} />
               </motion.div>
             )}
           </AnimatePresence>
@@ -190,14 +318,12 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
         {/* Status */}
         <motion.div 
           className="mt-8 text-center"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.6 }}
+          {...motionProps}
         >
           <p className="text-lg font-medium text-foreground/90 mb-1">
             {getStatusText()}
           </p>
-          {orbState === 'processing' && (
+          {orbState === 'processing' && !prefersReducedMotion && (
             <div className="flex items-center justify-center gap-1 mt-2">
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -206,15 +332,12 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
           )}
         </motion.div>
 
-        {/* Transcript/Response */}
+        {/* Current Transcript/Response */}
         <AnimatePresence mode="wait">
           {(transcript || agentResponse) && (
             <motion.div 
               className="mt-6 w-full max-w-md space-y-3"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.4 }}
+              {...motionProps}
             >
               {transcript && (
                 <div className="p-3 rounded-lg bg-secondary/30 backdrop-blur-sm border border-border/30">
@@ -251,7 +374,8 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
           <Button
             size="lg"
             className={cn(
-              "h-16 w-16 rounded-full transition-all duration-300",
+              "h-16 w-16 rounded-full",
+              !prefersReducedMotion && "transition-all duration-300",
               orbState === 'idle' 
                 ? "bg-primary hover:bg-primary/90 shadow-lg shadow-primary/30" 
                 : "bg-destructive hover:bg-destructive/90 shadow-lg shadow-destructive/30"
@@ -270,6 +394,33 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
         </div>
       </footer>
 
+      {/* Conversation History Panel */}
+      <AnimatePresence>
+        {showHistory && (
+          <motion.div
+            className="absolute inset-0 z-20 bg-background/95 backdrop-blur-lg"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.2 }}
+          >
+            <div className="h-full flex flex-col">
+              <div className="flex items-center justify-between p-4 border-b border-border/30">
+                <h2 className="text-xl font-semibold">Conversation History</h2>
+                <Button variant="ghost" size="icon" onClick={() => setShowHistory(false)}>
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              <ConversationHistory 
+                messages={conversationHistory} 
+                className="flex-1"
+                reducedMotion={prefersReducedMotion}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Settings panel */}
       <AnimatePresence>
         {showSettings && (
@@ -278,6 +429,7 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.2 }}
           >
             <div className="h-full overflow-y-auto p-6">
               <div className="max-w-md mx-auto space-y-6">
@@ -324,6 +476,47 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
+                      <Label>Sound Effects</Label>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Play tones when state changes
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings.soundEffects}
+                      onCheckedChange={(v) => setSettings(s => ({ ...s, soundEffects: v }))}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Haptic Feedback</Label>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Vibration feedback on mobile devices
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings.hapticFeedback}
+                      onCheckedChange={(v) => setSettings(s => ({ ...s, hapticFeedback: v }))}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Reduced Motion</Label>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Minimize animations for accessibility
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings.reducedMotion}
+                      onCheckedChange={(v) => setSettings(s => ({ ...s, reducedMotion: v }))}
+                    />
+                  </div>
+
+                  <div className="h-px bg-border my-4" />
+
+                  <div className="flex items-center justify-between">
+                    <div>
                       <Label>Auto-Listen After Response</Label>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         Automatically start listening after AI responds
@@ -363,19 +556,6 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
 
                   <div className="flex items-center justify-between">
                     <div>
-                      <Label>Haptic Feedback</Label>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Vibration feedback on mobile devices
-                      </p>
-                    </div>
-                    <Switch
-                      checked={settings.hapticFeedback}
-                      onCheckedChange={(v) => setSettings(s => ({ ...s, hapticFeedback: v }))}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
                       <Label>Wake Word Detection</Label>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         Say "Hey Council" to activate (coming soon)
@@ -391,20 +571,18 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
 
                 <div className="h-px bg-border my-6" />
 
-                {/* Audio visualization preview */}
+                {/* Keyboard shortcuts info */}
                 <div className="p-4 rounded-lg bg-secondary/30 border border-border/50">
-                  <Label className="mb-3 block">Audio Level Preview</Label>
-                  <div className="flex items-end justify-center gap-1 h-12">
-                    {Array.from({ length: 20 }).map((_, i) => (
-                      <div
-                        key={i}
-                        className="w-1.5 bg-primary rounded-full transition-all duration-100"
-                        style={{ 
-                          height: `${Math.random() * 100}%`,
-                          opacity: 0.3 + Math.random() * 0.7
-                        }}
-                      />
-                    ))}
+                  <Label className="mb-3 block">Keyboard Shortcuts</Label>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Toggle voice</span>
+                      <kbd className="px-2 py-0.5 rounded bg-background border border-border text-xs">Space</kbd>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Close interface</span>
+                      <kbd className="px-2 py-0.5 rounded bg-background border border-border text-xs">Esc</kbd>
+                    </div>
                   </div>
                 </div>
               </div>

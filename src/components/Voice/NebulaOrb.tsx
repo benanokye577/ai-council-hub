@@ -10,6 +10,8 @@ interface NebulaOrbProps {
   shape?: OrbShape;
   audioLevel?: number;
   onReady?: () => void;
+  paused?: boolean;
+  reducedMotion?: boolean;
 }
 
 // Vertex shader with multi-shape morphing
@@ -291,7 +293,7 @@ const colorPalettes = {
   },
 };
 
-export function NebulaOrb({ state, shape, audioLevel = 0, onReady }: NebulaOrbProps) {
+export function NebulaOrb({ state, shape, audioLevel = 0, onReady, paused = false, reducedMotion = false }: NebulaOrbProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<{
     scene: THREE.Scene;
@@ -486,6 +488,45 @@ export function NebulaOrb({ state, shape, audioLevel = 0, onReady }: NebulaOrbPr
       }
     };
   }, [init]);
+
+  // Handle paused state - pause/resume animation loop
+  useEffect(() => {
+    if (!sceneRef.current) return;
+    
+    if (paused) {
+      cancelAnimationFrame(sceneRef.current.animationId);
+    } else {
+      // Resume animation
+      let lastTime = performance.now();
+      const animate = (currentTime: number) => {
+        if (!sceneRef.current || paused) return;
+        
+        const { renderer: r, scene: s, camera: cam, particles: p, material: m, geometry: geo } = sceneRef.current;
+        
+        const deltaTime = reducedMotion ? 0.016 : (currentTime - lastTime) / 1000;
+        lastTime = currentTime;
+        
+        m.uniforms.uTime.value += deltaTime * (reducedMotion ? 0.3 : 1);
+        
+        // Smooth LOD transition
+        const diff = sceneRef.current.targetParticles - sceneRef.current.currentParticles;
+        if (Math.abs(diff) > 10) {
+          sceneRef.current.currentParticles += diff * Math.min(deltaTime * 3, 1);
+          geo.setDrawRange(0, Math.round(sceneRef.current.currentParticles));
+        }
+        
+        // Rotation - slower in reduced motion mode
+        const rotSpeed = reducedMotion ? 0.0005 : 0.002;
+        p.rotation.y += rotSpeed * deltaTime * 60;
+        p.rotation.x = Math.sin(m.uniforms.uTime.value * 0.1) * (reducedMotion ? 0.05 : 0.15);
+        p.rotation.z = Math.cos(m.uniforms.uTime.value * 0.08) * (reducedMotion ? 0.02 : 0.05);
+        
+        r.render(s, cam);
+        sceneRef.current.animationId = requestAnimationFrame(animate);
+      };
+      sceneRef.current.animationId = requestAnimationFrame(animate);
+    }
+  }, [paused, reducedMotion]);
 
   // Update audio level - throttled for performance
   const lastAudioUpdateRef = useRef(0);
