@@ -1,10 +1,6 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import * as THREE from 'three';
 import { gsap } from 'gsap';
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 
 export type OrbState = 'idle' | 'listening' | 'processing' | 'speaking';
 export type OrbShape = 'sphere' | 'heart' | 'saturn' | 'torus' | 'spiral';
@@ -13,7 +9,6 @@ interface NebulaOrbProps {
   state: OrbState;
   shape?: OrbShape;
   audioLevel?: number;
-  bloomIntensity?: number;
   onReady?: () => void;
 }
 
@@ -296,22 +291,12 @@ const colorPalettes = {
   },
 };
 
-// Bloom settings per state
-const bloomSettings = {
-  idle: { strength: 1.2, radius: 0.6, threshold: 0.3 },
-  listening: { strength: 1.6, radius: 0.7, threshold: 0.25 },
-  processing: { strength: 2.0, radius: 0.8, threshold: 0.2 },
-  speaking: { strength: 1.8, radius: 0.75, threshold: 0.22 },
-};
-
-export function NebulaOrb({ state, shape, audioLevel = 0, bloomIntensity = 1, onReady }: NebulaOrbProps) {
+export function NebulaOrb({ state, shape, audioLevel = 0, onReady }: NebulaOrbProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<{
     scene: THREE.Scene;
     camera: THREE.PerspectiveCamera;
     renderer: THREE.WebGLRenderer;
-    composer: EffectComposer;
-    bloomPass: UnrealBloomPass;
     particles: THREE.Points;
     material: THREE.ShaderMaterial;
     animationId: number;
@@ -342,22 +327,6 @@ export function NebulaOrb({ state, shape, audioLevel = 0, bloomIntensity = 1, on
     renderer.toneMappingExposure = 1.2;
     container.appendChild(renderer.domElement);
 
-    // Post-processing setup
-    const composer = new EffectComposer(renderer);
-    
-    const renderPass = new RenderPass(scene, camera);
-    composer.addPass(renderPass);
-    
-    const bloomPass = new UnrealBloomPass(
-      new THREE.Vector2(width, height),
-      1.2,  // strength
-      0.6,  // radius
-      0.3   // threshold
-    );
-    composer.addPass(bloomPass);
-    
-    const outputPass = new OutputPass();
-    composer.addPass(outputPass);
 
     // Generate all shapes
     const particleCount = 45000;
@@ -411,8 +380,6 @@ export function NebulaOrb({ state, shape, audioLevel = 0, bloomIntensity = 1, on
       scene,
       camera,
       renderer,
-      composer,
-      bloomPass,
       particles,
       material,
       animationId: 0
@@ -423,22 +390,18 @@ export function NebulaOrb({ state, shape, audioLevel = 0, bloomIntensity = 1, on
     const animate = () => {
       if (!sceneRef.current) return;
       
-      const { composer: c, particles: p, material: m, bloomPass: bp } = sceneRef.current;
+      const { renderer: r, scene: s, camera: cam, particles: p, material: m } = sceneRef.current;
       
       time += 0.016;
       m.uniforms.uTime.value = time;
-      
-      // Dynamic bloom based on audio
-      const audioBoost = m.uniforms.uAudioLevel.value;
-      bp.strength = bp.strength + (audioBoost * 0.3);
       
       // Gentle rotation
       p.rotation.y += 0.002;
       p.rotation.x = Math.sin(time * 0.1) * 0.15;
       p.rotation.z = Math.cos(time * 0.08) * 0.05;
       
-      // Render with post-processing
-      c.render();
+      // Standard rendering
+      r.render(s, cam);
       
       sceneRef.current.animationId = requestAnimationFrame(animate);
     };
@@ -454,7 +417,6 @@ export function NebulaOrb({ state, shape, audioLevel = 0, bloomIntensity = 1, on
       sceneRef.current.camera.aspect = w / h;
       sceneRef.current.camera.updateProjectionMatrix();
       sceneRef.current.renderer.setSize(w, h);
-      sceneRef.current.composer.setSize(w, h);
     };
 
     window.addEventListener('resize', handleResize);
@@ -471,7 +433,6 @@ export function NebulaOrb({ state, shape, audioLevel = 0, bloomIntensity = 1, on
       cleanup?.();
       if (sceneRef.current) {
         cancelAnimationFrame(sceneRef.current.animationId);
-        sceneRef.current.composer.dispose();
         sceneRef.current.renderer.dispose();
         sceneRef.current.particles.geometry.dispose();
         (sceneRef.current.particles.material as THREE.Material).dispose();
@@ -491,34 +452,13 @@ export function NebulaOrb({ state, shape, audioLevel = 0, bloomIntensity = 1, on
     });
   }, [audioLevel]);
 
-  // Update bloom intensity
-  useEffect(() => {
-    if (!sceneRef.current) return;
-    const baseSettings = bloomSettings[state];
-    gsap.to(sceneRef.current.bloomPass, {
-      strength: baseSettings.strength * bloomIntensity,
-      duration: 0.5,
-      ease: 'power2.out'
-    });
-  }, [bloomIntensity, state]);
-
-  // Handle state transitions with shape morphing and bloom
+  // Handle state transitions with shape morphing
   useEffect(() => {
     if (!sceneRef.current) return;
     
-    const { material, bloomPass } = sceneRef.current;
+    const { material } = sceneRef.current;
     const u = material.uniforms;
     const palette = colorPalettes[state];
-    const bloom = bloomSettings[state];
-    
-    // Transition bloom settings
-    gsap.to(bloomPass, {
-      strength: bloom.strength * bloomIntensity,
-      radius: bloom.radius,
-      threshold: bloom.threshold,
-      duration: 1,
-      ease: 'power2.inOut'
-    });
     
     // Transition colors
     gsap.to(u.uColorA.value, { r: palette.colorA.r, g: palette.colorA.g, b: palette.colorA.b, duration: 1.2 });
@@ -569,7 +509,7 @@ export function NebulaOrb({ state, shape, audioLevel = 0, bloomIntensity = 1, on
         gsap.to(u.uPulse, { value: 0.3, duration: 0.5 });
         break;
     }
-  }, [state, bloomIntensity]);
+  }, [state]);
 
   // Handle explicit shape override
   useEffect(() => {
