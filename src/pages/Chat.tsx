@@ -28,6 +28,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { QuickActions, detectResponseType } from "@/components/chat/QuickActions";
+import { AgentContributionBadges } from "@/components/chat/AgentContributionBadges";
 
 interface AgentContribution {
   name: string;
@@ -337,8 +339,23 @@ function CouncilDeliberation({ deliberation }: { deliberation: Message["councilD
   );
 }
 
-function ChatMessage({ message }: { message: Message }) {
+function ChatMessage({ message, onQuickAction }: { message: Message; onQuickAction?: (prompt: string) => void }) {
   const isUser = message.role === "user";
+  const responseType = !isUser ? detectResponseType(message.content) : "general";
+
+  // Convert council contributions to agent contribution format
+  const agentContributions = message.councilDeliberation?.contributions.map(c => ({
+    name: c.name,
+    expertise: c.expertise,
+    contribution: c.weight,
+    color: c.color,
+  })) || [];
+
+  const handleQuickAction = (action: { prompt: string }) => {
+    if (action.prompt && onQuickAction) {
+      onQuickAction(action.prompt);
+    }
+  };
 
   return (
     <motion.div
@@ -367,6 +384,11 @@ function ChatMessage({ message }: { message: Message }) {
           isUser ? "chat-bubble-user" : "chat-bubble-ai"
         )}
       >
+        {/* Agent Attribution Badges - Show by default for assistant messages */}
+        {!isUser && agentContributions.length > 0 && (
+          <AgentContributionBadges contributions={agentContributions} compact />
+        )}
+
         <div className="prose prose-invert prose-sm max-w-none">
           <ReactMarkdown
             components={{
@@ -417,6 +439,15 @@ function ChatMessage({ message }: { message: Message }) {
             {message.content}
           </ReactMarkdown>
         </div>
+
+        {/* Quick Actions - contextual based on response type */}
+        {!isUser && (
+          <QuickActions 
+            responseType={responseType} 
+            onAction={handleQuickAction}
+            content={message.content}
+          />
+        )}
         
         {/* Council Deliberation Section */}
         {!isUser && message.councilDeliberation && (
@@ -605,7 +636,13 @@ export default function Chat() {
         <ScrollArea className="flex-1 p-4">
           <div className="max-w-3xl mx-auto space-y-4">
             {messages.map((message) => (
-              <ChatMessage key={message.id} message={message} />
+              <ChatMessage 
+                key={message.id} 
+                message={message} 
+                onQuickAction={(prompt) => {
+                  setInput(prompt);
+                }}
+              />
             ))}
             {isTyping && <TypingIndicator />}
             <div ref={messagesEndRef} />

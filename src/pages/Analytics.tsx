@@ -12,7 +12,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
 } from "recharts";
 import {
   TrendingUp,
@@ -25,6 +24,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { CouncilInsightsCard } from "@/components/dashboard/CouncilInsightsCard";
 
 const tokenData = [
   { date: "Dec 18", tokens: 8500 },
@@ -441,59 +441,73 @@ export default function Analytics() {
           </Card>
         </motion.div>
 
-        {/* Agent Performance */}
+        {/* Council Insights - AI Generated */}
         <motion.div
           className="lg:col-span-2"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.35 }}
         >
-          <Card variant="gradient-border">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base">Agent Performance</CardTitle>
-                <Badge variant="outline" className="text-xs">
-                  Last 7 days
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {agentData.map((agent, index) => (
-                  <motion.div
-                    key={agent.name}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.4 + index * 0.05 }}
-                    className="flex items-center gap-4"
-                  >
-                    <div className="flex items-center gap-3 w-24">
-                      <Users className="w-4 h-4 text-foreground-tertiary" />
-                      <span className="text-sm text-foreground-secondary">
-                        {agent.name}
-                      </span>
-                    </div>
-                    <div className="flex-1 h-2 rounded-full bg-background-hover overflow-hidden">
-                      <motion.div
-                        className="h-full rounded-full"
-                        style={{ background: agent.color }}
-                        initial={{ width: 0 }}
-                        animate={{
-                          width: `${(agent.messages / 1203) * 100}%`,
-                        }}
-                        transition={{ delay: 0.5 + index * 0.1, duration: 0.5 }}
-                      />
-                    </div>
-                    <span className="text-sm font-medium text-foreground w-16 text-right">
-                      {agent.messages}
-                    </span>
-                  </motion.div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <CouncilInsightsCard />
         </motion.div>
       </div>
+
+      {/* Agent Performance - Full Width */}
+      <motion.div
+        className="mt-6"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+      >
+        <Card variant="gradient-border">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">Agent Performance</CardTitle>
+              <Badge variant="outline" className="text-xs">
+                Last 7 days
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              {agentData.map((agent, index) => (
+                <motion.div
+                  key={agent.name}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.45 + index * 0.05 }}
+                  className="p-4 rounded-lg bg-background-secondary/30 border border-border/50 hover:border-primary/30 transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-2 mb-3">
+                    <div
+                      className="w-8 h-8 rounded-lg flex items-center justify-center"
+                      style={{ backgroundColor: `${agent.color}20` }}
+                    >
+                      <Users className="w-4 h-4" style={{ color: agent.color }} />
+                    </div>
+                    <span className="text-sm font-medium text-foreground">
+                      {agent.name}
+                    </span>
+                  </div>
+                  <div className="text-2xl font-bold text-foreground mb-1">
+                    {agent.messages}
+                  </div>
+                  <div className="text-xs text-foreground-tertiary mb-2">messages</div>
+                  <div className="h-2 rounded-full bg-background-hover overflow-hidden">
+                    <motion.div
+                      className="h-full rounded-full"
+                      style={{ background: agent.color }}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${(agent.messages / 1203) * 100}%` }}
+                      transition={{ delay: 0.5 + index * 0.1, duration: 0.5 }}
+                    />
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
     </div>
   );
 }
