@@ -159,6 +159,17 @@ Conversations are automatically saved to localStorage:
 - Resume any past session instantly
 - Delete sessions individually
 
+### Cloud Sync (Planned)
+Cross-device conversation sync using Supabase:
+- Real-time sync across devices and browsers
+- Secure storage with Row Level Security (RLS)
+- Automatic conflict resolution
+- Offline-first with background sync
+- Database schema:
+  - `conversation_sessions` table with user_id, persona, timestamps
+  - `conversation_messages` table with session_id, role, content, timestamps
+- Implementation requires enabling Lovable Cloud
+
 ### Keyboard Shortcuts
 - `Space` - Start/stop conversation
 - `Escape` - Close voice interface
