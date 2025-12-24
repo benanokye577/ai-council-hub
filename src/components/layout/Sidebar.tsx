@@ -57,6 +57,7 @@ const navItems = [
   { icon: Mic, label: "Voice", path: "/voice" },
   { icon: Monitor, label: "Automation", path: "/automation" },
   { icon: Puzzle, label: "MCP", path: "/mcp" },
+  { icon: LayoutDashboard, label: "Workflows", path: "/workflows" },
   { icon: BookOpen, label: "Knowledge", path: "/knowledge" },
   { icon: BarChart3, label: "Analytics", path: "/analytics" },
   { icon: Wrench, label: "Tools", path: "/tools" },
