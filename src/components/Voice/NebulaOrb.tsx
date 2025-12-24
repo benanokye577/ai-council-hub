@@ -299,6 +299,8 @@ export function NebulaOrb({ state, shape, audioLevel = 0, onReady }: NebulaOrbPr
     renderer: THREE.WebGLRenderer;
     particles: THREE.Points;
     material: THREE.ShaderMaterial;
+    geometry: THREE.BufferGeometry;
+    maxParticles: number;
     animationId: number;
   } | null>(null);
   
@@ -329,8 +331,16 @@ export function NebulaOrb({ state, shape, audioLevel = 0, onReady }: NebulaOrbPr
     container.appendChild(renderer.domElement);
 
 
-    // Reduced particle count for better performance (was 45000)
-    const particleCount = 18000;
+    // LOD: Calculate particle count based on container size
+    const minSize = Math.min(width, height);
+    const getLODParticleCount = (size: number) => {
+      if (size >= 400) return 18000;      // High quality
+      if (size >= 300) return 12000;      // Medium quality
+      if (size >= 200) return 8000;       // Low quality
+      return 5000;                         // Ultra low for tiny containers
+    };
+    
+    const particleCount = getLODParticleCount(minSize);
     const geometry = new THREE.BufferGeometry();
     
     const sphere = generateSphere(particleCount, 1);
@@ -351,6 +361,9 @@ export function NebulaOrb({ state, shape, audioLevel = 0, onReady }: NebulaOrbPr
     geometry.setAttribute('aTorus', new THREE.BufferAttribute(torus, 3));
     geometry.setAttribute('aSpiral', new THREE.BufferAttribute(spiral, 3));
     geometry.setAttribute('aRandom', new THREE.BufferAttribute(randoms, 1));
+    
+    // Set draw range for LOD - can be adjusted dynamically
+    geometry.setDrawRange(0, particleCount);
 
     const palette = colorPalettes.idle;
     const material = new THREE.ShaderMaterial({
@@ -383,6 +396,8 @@ export function NebulaOrb({ state, shape, audioLevel = 0, onReady }: NebulaOrbPr
       renderer,
       particles,
       material,
+      geometry,
+      maxParticles: particleCount,
       animationId: 0
     };
 
@@ -414,6 +429,14 @@ export function NebulaOrb({ state, shape, audioLevel = 0, onReady }: NebulaOrbPr
     setIsInitialized(true);
     onReady?.();
 
+    // LOD helper for resize
+    const getLODCount = (size: number) => {
+      if (size >= 400) return 18000;
+      if (size >= 300) return 12000;
+      if (size >= 200) return 8000;
+      return 5000;
+    };
+
     const handleResize = () => {
       if (!sceneRef.current || !containerRef.current) return;
       const w = containerRef.current.clientWidth;
@@ -421,6 +444,11 @@ export function NebulaOrb({ state, shape, audioLevel = 0, onReady }: NebulaOrbPr
       sceneRef.current.camera.aspect = w / h;
       sceneRef.current.camera.updateProjectionMatrix();
       sceneRef.current.renderer.setSize(w, h);
+      
+      // Dynamic LOD adjustment on resize
+      const minSize = Math.min(w, h);
+      const targetParticles = Math.min(getLODCount(minSize), sceneRef.current.maxParticles);
+      sceneRef.current.geometry.setDrawRange(0, targetParticles);
     };
 
     window.addEventListener('resize', handleResize);
