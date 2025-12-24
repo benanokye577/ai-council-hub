@@ -129,7 +129,7 @@ export default {
         'gradient-glow': 'linear-gradient(135deg, hsl(var(--primary) / 0.4) 0%, hsl(var(--primary-light) / 0.2) 100%)',
         'gradient-card': 'linear-gradient(135deg, hsl(0 0% 100% / 0.08) 0%, hsl(0 0% 100% / 0.02) 100%)',
         'gradient-radial': 'radial-gradient(ellipse at center, var(--tw-gradient-stops))',
-        'gradient-mesh': 'radial-gradient(at 40% 20%, hsl(263 70% 58% / 0.15) 0px, transparent 50%), radial-gradient(at 80% 0%, hsl(270 70% 65% / 0.1) 0px, transparent 50%), radial-gradient(at 0% 50%, hsl(263 70% 58% / 0.08) 0px, transparent 50%)',
+        'gradient-mesh': 'var(--gradient-mesh, radial-gradient(at 40% 20%, hsl(263 70% 58% / 0.15) 0px, transparent 50%), radial-gradient(at 80% 0%, hsl(270 70% 65% / 0.1) 0px, transparent 50%), radial-gradient(at 0% 50%, hsl(263 70% 58% / 0.08) 0px, transparent 50%))',
       },
       keyframes: {
         "accordion-down": {
