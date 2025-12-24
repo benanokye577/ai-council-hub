@@ -317,19 +317,20 @@ export function NebulaOrb({ state, shape, audioLevel = 0, onReady }: NebulaOrbPr
     camera.position.z = 4;
 
     const renderer = new THREE.WebGLRenderer({
-      antialias: true,
+      antialias: false, // Disable for performance
       alpha: true,
       powerPreference: 'high-performance'
     });
     renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // Lower pixel ratio for better performance (max 1.5)
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.2;
     container.appendChild(renderer.domElement);
 
 
-    // Generate all shapes
-    const particleCount = 45000;
+    // Reduced particle count for better performance (was 45000)
+    const particleCount = 18000;
     const geometry = new THREE.BufferGeometry();
     
     const sphere = generateSphere(particleCount, 1);
@@ -385,20 +386,23 @@ export function NebulaOrb({ state, shape, audioLevel = 0, onReady }: NebulaOrbPr
       animationId: 0
     };
 
-    // Animation loop
-    let time = 0;
-    const animate = () => {
+    // Animation loop with proper timing
+    let lastTime = performance.now();
+    const animate = (currentTime: number) => {
       if (!sceneRef.current) return;
       
       const { renderer: r, scene: s, camera: cam, particles: p, material: m } = sceneRef.current;
       
-      time += 0.016;
-      m.uniforms.uTime.value = time;
+      // Use delta time for consistent animation speed
+      const deltaTime = (currentTime - lastTime) / 1000;
+      lastTime = currentTime;
+      
+      m.uniforms.uTime.value += deltaTime;
       
       // Gentle rotation
-      p.rotation.y += 0.002;
-      p.rotation.x = Math.sin(time * 0.1) * 0.15;
-      p.rotation.z = Math.cos(time * 0.08) * 0.05;
+      p.rotation.y += 0.002 * deltaTime * 60;
+      p.rotation.x = Math.sin(m.uniforms.uTime.value * 0.1) * 0.15;
+      p.rotation.z = Math.cos(m.uniforms.uTime.value * 0.08) * 0.05;
       
       // Standard rendering
       r.render(s, cam);
@@ -406,7 +410,7 @@ export function NebulaOrb({ state, shape, audioLevel = 0, onReady }: NebulaOrbPr
       sceneRef.current.animationId = requestAnimationFrame(animate);
     };
 
-    animate();
+    sceneRef.current.animationId = requestAnimationFrame(animate);
     setIsInitialized(true);
     onReady?.();
 
@@ -442,14 +446,19 @@ export function NebulaOrb({ state, shape, audioLevel = 0, onReady }: NebulaOrbPr
     };
   }, [init]);
 
-  // Update audio level
+  // Update audio level - throttled for performance
+  const lastAudioUpdateRef = useRef(0);
   useEffect(() => {
     if (!sceneRef.current) return;
-    gsap.to(sceneRef.current.material.uniforms.uAudioLevel, {
-      value: audioLevel,
-      duration: 0.08,
-      ease: 'power2.out'
-    });
+    
+    // Throttle audio updates to max 30fps
+    const now = performance.now();
+    if (now - lastAudioUpdateRef.current < 33) return;
+    lastAudioUpdateRef.current = now;
+    
+    // Direct update instead of gsap for better performance
+    sceneRef.current.material.uniforms.uAudioLevel.value = 
+      sceneRef.current.material.uniforms.uAudioLevel.value * 0.7 + audioLevel * 0.3;
   }, [audioLevel]);
 
   // Handle state transitions with shape morphing
