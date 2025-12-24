@@ -17,6 +17,7 @@ import Focus from "./pages/Focus";
 import Voice from "./pages/Voice";
 import Automation from "./pages/Automation";
 import MCP from "./pages/MCP";
+import Workflows from "./pages/Workflows";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +39,7 @@ const App = () => (
               <Route path="/voice" element={<Voice />} />
               <Route path="/automation" element={<Automation />} />
               <Route path="/mcp" element={<MCP />} />
+              <Route path="/workflows" element={<Workflows />} />
               <Route path="/knowledge" element={<Knowledge />} />
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/tools" element={<Tools />} />
