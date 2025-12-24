@@ -19,6 +19,7 @@ import Automation from "./pages/Automation";
 import MCP from "./pages/MCP";
 import Workflows from "./pages/Workflows";
 import Study from "./pages/Study";
+import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -46,6 +47,7 @@ const App = () => (
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/tools" element={<Tools />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/auth" element={<Auth />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AppLayout>
