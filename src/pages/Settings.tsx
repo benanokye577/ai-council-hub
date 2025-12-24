@@ -7,14 +7,11 @@ import {
   Shield,
   Keyboard,
   Info,
-  ChevronRight,
   Check,
   Moon,
   Sun,
   Globe,
-  Bell,
   Zap,
-  Database,
   Trash2,
   Download,
 } from "lucide-react";
@@ -33,6 +30,17 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { useTheme } from "@/contexts/ThemeContext";
+
+type AccentColor = "violet" | "blue" | "emerald" | "amber" | "rose";
+
+const accentColorOptions: { id: AccentColor; bg: string }[] = [
+  { id: "violet", bg: "bg-violet-500" },
+  { id: "blue", bg: "bg-blue-500" },
+  { id: "emerald", bg: "bg-emerald-500" },
+  { id: "amber", bg: "bg-amber-500" },
+  { id: "rose", bg: "bg-rose-500" },
+];
 
 const settingsTabs = [
   { id: "general", label: "General", icon: User },
@@ -54,6 +62,7 @@ const shortcuts = [
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState("general");
+  const { accentColor, setAccentColor } = useTheme();
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)]">
@@ -231,19 +240,14 @@ export default function Settings() {
                 </CardHeader>
                 <CardContent>
                   <div className="flex gap-3">
-                    {[
-                      "bg-violet-500",
-                      "bg-blue-500",
-                      "bg-emerald-500",
-                      "bg-amber-500",
-                      "bg-rose-500",
-                    ].map((color, index) => (
+                    {accentColorOptions.map((color) => (
                       <button
-                        key={color}
+                        key={color.id}
+                        onClick={() => setAccentColor(color.id)}
                         className={cn(
-                          "w-10 h-10 rounded-full transition-transform hover:scale-110",
-                          color,
-                          index === 0 && "ring-2 ring-offset-2 ring-offset-background ring-foreground"
+                          "w-10 h-10 rounded-full transition-all hover:scale-110",
+                          color.bg,
+                          accentColor === color.id && "ring-2 ring-offset-2 ring-offset-background ring-foreground"
                         )}
                       />
                     ))}
