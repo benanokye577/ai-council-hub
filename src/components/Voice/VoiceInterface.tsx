@@ -1,7 +1,10 @@
 // Voice Interface with ElevenLabs integration
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, MicOff, Settings, X, Volume2, VolumeX, Loader2, History, Keyboard, User, FolderOpen } from 'lucide-react';
+import { 
+  Mic, MicOff, Settings, X, Volume2, VolumeX, Loader2, History, Keyboard, User, FolderOpen,
+  Bell, BarChart3, Command, Workflow, Brain, WifiOff, Users, ChevronDown
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
@@ -20,6 +23,21 @@ import { ConversationExport } from './ConversationExport';
 import { VoiceWaveform } from './VoiceWaveform';
 import { useConversationMemory } from '@/hooks/useConversationMemory';
 import { SessionList } from './SessionList';
+import { RemindersManager } from '@/components/Reminders/RemindersManager';
+import { InsightsDashboard } from '@/components/Insights/InsightsDashboard';
+import { CommandEditor } from '@/components/Commands/CommandEditor';
+import { WorkflowManager } from '@/components/Workflows/WorkflowManager';
+import { ContextMemoryPanel } from '@/components/Memory/ContextMemoryPanel';
+import { OfflineStatus } from '@/components/Offline/OfflineStatus';
+import { DebateSimulator } from '@/components/Council/DebateSimulator';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from '@/components/ui/dropdown-menu';
 
 interface VoiceInterfaceProps {
   onClose?: () => void;
@@ -36,6 +54,15 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
   const [isMuted, setIsMuted] = useState(false);
   const [isTabVisible, setIsTabVisible] = useState(true);
   const [selectedPersona, setSelectedPersona] = useState<VoicePersona>(VOICE_PERSONAS[0]);
+  
+  // Feature panel states
+  const [showReminders, setShowReminders] = useState(false);
+  const [showInsights, setShowInsights] = useState(false);
+  const [showCommands, setShowCommands] = useState(false);
+  const [showWorkflows, setShowWorkflows] = useState(false);
+  const [showMemory, setShowMemory] = useState(false);
+  const [showOffline, setShowOffline] = useState(false);
+  const [showDebates, setShowDebates] = useState(false);
 
   // Conversation memory hook for persistence
   const {
@@ -201,9 +228,11 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
   // Keyboard shortcut - Spacebar to toggle
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger if user is typing in an input or if settings is open
+      // Don't trigger if user is typing in an input or if a panel is open
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (showSettings || showHistory || showPersonas || showSessions) return;
+      const anyPanelOpen = showSettings || showHistory || showPersonas || showSessions || 
+        showReminders || showInsights || showCommands || showWorkflows || showMemory || showOffline || showDebates;
+      if (anyPanelOpen) return;
       
       if (e.code === 'Space' && isOrbReady) {
         e.preventDefault();
@@ -218,7 +247,8 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleToggleConversation, isOrbReady, showSettings, showHistory, showPersonas, showSessions, onClose]);
+  }, [handleToggleConversation, isOrbReady, showSettings, showHistory, showPersonas, showSessions, 
+      showReminders, showInsights, showCommands, showWorkflows, showMemory, showOffline, showDebates, onClose]);
 
   const getStatusText = () => {
     switch (orbState) {
@@ -272,6 +302,54 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* Features Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                className="h-9 gap-1.5 text-muted-foreground hover:text-foreground"
+              >
+                <Command className="w-4 h-4" />
+                <span className="text-xs hidden sm:inline">Features</span>
+                <ChevronDown className="w-3 h-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel>Quick Access</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setShowReminders(true)}>
+                <Bell className="w-4 h-4 mr-2" />
+                Reminders
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowInsights(true)}>
+                <BarChart3 className="w-4 h-4 mr-2" />
+                Insights
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowCommands(true)}>
+                <Command className="w-4 h-4 mr-2" />
+                Voice Commands
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowWorkflows(true)}>
+                <Workflow className="w-4 h-4 mr-2" />
+                Workflows
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setShowMemory(true)}>
+                <Brain className="w-4 h-4 mr-2" />
+                Memory
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowOffline(true)}>
+                <WifiOff className="w-4 h-4 mr-2" />
+                Offline Mode
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowDebates(true)}>
+                <Users className="w-4 h-4 mr-2" />
+                AI Debates
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <Button 
             variant="ghost" 
             size="icon" 
@@ -732,6 +810,202 @@ export function VoiceInterface({ onClose, className }: VoiceInterfaceProps) {
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Reminders Panel */}
+      <AnimatePresence>
+        {showReminders && (
+          <motion.div
+            className="absolute inset-0 z-20 bg-background/95 backdrop-blur-lg"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.2 }}
+          >
+            <div className="h-full flex flex-col">
+              <div className="flex items-center justify-between p-4 border-b border-border/30">
+                <div>
+                  <h2 className="text-xl font-semibold">Smart Reminders</h2>
+                  <p className="text-sm text-muted-foreground">Voice-activated reminders</p>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setShowReminders(false)}>
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4">
+                <RemindersManager />
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Insights Panel */}
+      <AnimatePresence>
+        {showInsights && (
+          <motion.div
+            className="absolute inset-0 z-20 bg-background/95 backdrop-blur-lg"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.2 }}
+          >
+            <div className="h-full flex flex-col">
+              <div className="flex items-center justify-between p-4 border-b border-border/30">
+                <div>
+                  <h2 className="text-xl font-semibold">Conversation Insights</h2>
+                  <p className="text-sm text-muted-foreground">Analytics & trends</p>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setShowInsights(false)}>
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4">
+                <InsightsDashboard />
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Commands Panel */}
+      <AnimatePresence>
+        {showCommands && (
+          <motion.div
+            className="absolute inset-0 z-20 bg-background/95 backdrop-blur-lg"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.2 }}
+          >
+            <div className="h-full flex flex-col">
+              <div className="flex items-center justify-between p-4 border-b border-border/30">
+                <div>
+                  <h2 className="text-xl font-semibold">Voice Commands</h2>
+                  <p className="text-sm text-muted-foreground">Custom shortcuts & triggers</p>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setShowCommands(false)}>
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4">
+                <CommandEditor />
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Workflows Panel */}
+      <AnimatePresence>
+        {showWorkflows && (
+          <motion.div
+            className="absolute inset-0 z-20 bg-background/95 backdrop-blur-lg"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.2 }}
+          >
+            <div className="h-full flex flex-col">
+              <div className="flex items-center justify-between p-4 border-b border-border/30">
+                <div>
+                  <h2 className="text-xl font-semibold">Workflow Triggers</h2>
+                  <p className="text-sm text-muted-foreground">Automate actions from voice</p>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setShowWorkflows(false)}>
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4">
+                <WorkflowManager />
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Memory Panel */}
+      <AnimatePresence>
+        {showMemory && (
+          <motion.div
+            className="absolute inset-0 z-20 bg-background/95 backdrop-blur-lg"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.2 }}
+          >
+            <div className="h-full flex flex-col">
+              <div className="flex items-center justify-between p-4 border-b border-border/30">
+                <div>
+                  <h2 className="text-xl font-semibold">Context Memory</h2>
+                  <p className="text-sm text-muted-foreground">Long-term preferences</p>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setShowMemory(false)}>
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4">
+                <ContextMemoryPanel />
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Offline Panel */}
+      <AnimatePresence>
+        {showOffline && (
+          <motion.div
+            className="absolute inset-0 z-20 bg-background/95 backdrop-blur-lg"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.2 }}
+          >
+            <div className="h-full flex flex-col">
+              <div className="flex items-center justify-between p-4 border-b border-border/30">
+                <div>
+                  <h2 className="text-xl font-semibold">Offline Mode</h2>
+                  <p className="text-sm text-muted-foreground">Cached data & sync status</p>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setShowOffline(false)}>
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4">
+                <OfflineStatus />
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Debates Panel */}
+      <AnimatePresence>
+        {showDebates && (
+          <motion.div
+            className="absolute inset-0 z-20 bg-background/95 backdrop-blur-lg"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.2 }}
+          >
+            <div className="h-full flex flex-col">
+              <div className="flex items-center justify-between p-4 border-b border-border/30">
+                <div>
+                  <h2 className="text-xl font-semibold">AI Debates</h2>
+                  <p className="text-sm text-muted-foreground">Multi-agent discussions</p>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setShowDebates(false)}>
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4">
+                <DebateSimulator />
               </div>
             </div>
           </motion.div>
